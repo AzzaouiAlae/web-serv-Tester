@@ -7,6 +7,8 @@ HandlerTestsList::HandlerTestsList()
 
 void HandlerTestsList::CreateTests() {
 	_happyPathTests = new HappyPathTests();
+	_errorHandlingTests  = new ErrorHandlingTests();
+	_clientBodySizeTests = new ClientBodySizeTests();
 }
 
 HandlerTestsList::~HandlerTestsList() {

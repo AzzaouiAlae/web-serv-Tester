@@ -19,7 +19,8 @@ struct TestCase {
 	string response;
 	size_t contentLength;
 	size_t headerLength;
-	TestCase (): sendedBytes(0) {
+	bool passed;
+	TestCase (): sendedBytes(0), passed(false) {
 		responseBuffer = new char[KBYTE];
 		contentLength = -1;
 		headerLength = -1;
@@ -32,9 +33,12 @@ struct TestCase {
 class ATestList {
 	
 	string _name;
-	int nbTests;
 	static vector<ATestList *> _testLists;
+
 protected:
+	int _failedTests;
+	int _passedTests;
+	vector<pair<string, void (ATestList::*)()> > _testFunctions;
 	Multiplexer multiplexer;
 	static bool GetContentLength(string &response, size_t &contentLength);
 	static bool GetResponseHeaderLength(string &response, size_t &headerLength);
@@ -43,11 +47,20 @@ protected:
 	bool connectToServer(TestCase &config);
 	void printTestCard(TestCase &config);
 	void actServerResponse(TestCase &config);
-	void printServerResponseHeader(const string &response);
-	void preperForNextTest();
+	void printServerResponseHeader(TestCase &config);
 	void RunTestCase(TestCase &config);
+	void PrintTestResult();
+	void ResetTestResults();
 public:
-	virtual void ShowTestsList() = 0;
+	int getFailedTests() const;
+	int getPassedTests() const;
+	static void preperForNextTest();
+	static int readIntegerInput();
+	static string readInput();
+	virtual void AddAllTests() = 0;
+	virtual void performTestCase(int choice);
+	virtual void RunAllTests();
+	virtual void ShowTestsList();
 	ATestList(const string &name);
 	string getName() const;
 	virtual ~ATestList();

@@ -4,15 +4,25 @@
 
 class HappyPathTests: public ATestList
 {
+	// Original tests
 	void GetIndexTest();
 	void GetStaticHtmlTest();
-	void RunAllTests();
 	void GetBinaryFileTest();
 	void GetDirectoryWithTrailingSlashTest();
 	void HeadRequestTest();
-	void performTestCase(int choice);
+
+	// New tests
+	void PostSimpleTextTest();
+	void DeleteExistingFileTest();
+	void GetCssFileTest();
+	void GetImageFileTest();
+	void GetLargeHtmlTest();
+	void PostUploadTextFileTest();
+	void PostUploadBinaryFileTest();
+	void GetAlternatePortTest();
+
+	void AddAllTests();
 public:
 	HappyPathTests();
 	~HappyPathTests();
-	void ShowTestsList();
 };

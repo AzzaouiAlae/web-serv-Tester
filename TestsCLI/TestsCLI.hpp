@@ -7,17 +7,14 @@
 class TestCLI {
 	vector<ATestList *> _testLists;
 	HandlerTestsList handlerTestsList;
-public:
-	
-    TestCLI(int argc, char const *argv[]);
-    ~TestCLI();
-
-    void run();
+	int _failedTests;
+	int _passedTests;
+	int _testsCount;
+	void RunAllTests();
 	void PrintScreen();
-	void initTests();
-
-private:
-    int _argc;
-    char const **_argv;
-	
+	void PrintTestResult();
+public:
+    TestCLI();
+    ~TestCLI();
+    void run();
 };

@@ -1,9 +1,8 @@
 #include "TestsCLI/TestsCLI.hpp"
 
-int main(int argc, char const *argv[])
+int main()
 {
-	
-    TestCLI test(argc, argv);
+    TestCLI test;
     test.run();
 
     return 0;
