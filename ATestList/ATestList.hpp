@@ -3,7 +3,7 @@
 #include "../Multiplexer/Multiplexer.hpp"
 #include "../Socket/Socket.hpp"
 
-struct TestConfig {
+struct TestCase {
 	string name;
 	string description;
 	string port;
@@ -19,12 +19,12 @@ struct TestConfig {
 	string response;
 	size_t contentLength;
 	size_t headerLength;
-	TestConfig (): sendedBytes(0) {
+	TestCase (): sendedBytes(0) {
 		responseBuffer = new char[KBYTE];
 		contentLength = -1;
 		headerLength = -1;
 	}
-	~TestConfig() {
+	~TestCase() {
 		delete[] responseBuffer;
 	}
 };
@@ -38,12 +38,14 @@ protected:
 	Multiplexer multiplexer;
 	static bool GetContentLength(string &response, size_t &contentLength);
 	static bool GetResponseHeaderLength(string &response, size_t &headerLength);
-	bool SendRequestToServer(TestConfig &config);
-	bool ReadResponseFromServer(TestConfig &config);
-	bool connectToServer(TestConfig &config);
-	void printTestCard(TestConfig &config);
-	void actServerResponse(TestConfig &config);
+	bool SendRequestToServer(TestCase &config);
+	bool ReadResponseFromServer(TestCase &config);
+	bool connectToServer(TestCase &config);
+	void printTestCard(TestCase &config);
+	void actServerResponse(TestCase &config);
 	void printServerResponseHeader(const string &response);
+	void preperForNextTest();
+	void RunTestCase(TestCase &config);
 public:
 	virtual void ShowTestsList() = 0;
 	ATestList(const string &name);

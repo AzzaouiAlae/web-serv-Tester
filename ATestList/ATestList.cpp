@@ -21,14 +21,14 @@ vector<ATestList *> ATestList::getTestLists()
 	return _testLists;
 }
 
-void ATestList::printTestCard(TestConfig &config)
+void ATestList::printTestCard(TestCase &config)
 {
 	cout << "Test: " << config.name << endl;
 	cout << "Description: " << config.description << endl;
 	cout << "------------------" << endl;
 }
 
-bool ATestList::connectToServer(TestConfig &config)
+bool ATestList::connectToServer(TestCase &config)
 {
 	config.socket = Socket::inetConnect(config.host, config.port, SOCK_STREAM);
 	if (config.socket == -1)
@@ -40,7 +40,7 @@ bool ATestList::connectToServer(TestConfig &config)
 	return true;
 }
 
-bool ATestList::SendRequestToServer(TestConfig &config)
+bool ATestList::SendRequestToServer(TestCase &config)
 {
 	multiplexer.AddAsEpollOut(config.socketIO);
 	while (config.sendedBytes < config.request.size())
@@ -55,7 +55,7 @@ bool ATestList::SendRequestToServer(TestConfig &config)
 			return false;
 		}
 		else if ((multiplexer.eventList[0].events & EPOLLOUT) == 0) {
-			cerr << "Unexpected event type." << endl;
+			cerr << "Send Request Unexpected event type." << endl;
 			return false;
 		}
 		int sentBytes = config.socketIO->Send((void*)(config.request.c_str() + config.sendedBytes), config.request.size() - config.sendedBytes);
@@ -69,7 +69,7 @@ bool ATestList::SendRequestToServer(TestConfig &config)
 	return true;
 }
 
-bool ATestList::ReadResponseFromServer(TestConfig &config)
+bool ATestList::ReadResponseFromServer(TestCase &config)
 {
 	multiplexer.ChangeToEpollIn(config.socketIO);
 	while (true)
@@ -84,7 +84,7 @@ bool ATestList::ReadResponseFromServer(TestConfig &config)
 			return false;
 		}
 		else if ((multiplexer.eventList[0].events & EPOLLIN) == 0) {
-			cerr << "Unexpected event type." << endl;
+			cerr << "Read Response Unexpected event type." << endl;
 			return false;
 		}
 		int receivedBytes = read(config.socketIO->GetFd(), config.responseBuffer, KBYTE);
@@ -101,6 +101,7 @@ bool ATestList::ReadResponseFromServer(TestConfig &config)
 				break;
 		}
 	}
+	multiplexer.DeleteFromEpoll(config.socketIO);
 	return true;
 }
 
@@ -135,12 +136,12 @@ bool ATestList::GetResponseHeaderLength(string &response, size_t &headerLength)
 	return false;
 }
 
-void ATestList::actServerResponse(TestConfig &config)
+void ATestList::actServerResponse(TestCase &config)
 {
 	if (config.response.find(config.expectedResponse) != string::npos)
-		cout << "GetIndexTest passed." << endl;
+		cout << config.name << " passed." << endl;
 	else
-		cerr << "GetIndexTest failed." << endl;
+		cerr << config.name << " failed." << endl;
 	string responseHeader = config.response.substr(0, config.headerLength);
 	printServerResponseHeader(responseHeader);
 }
@@ -151,4 +152,29 @@ void ATestList::printServerResponseHeader(const string &response)
 	cout << "------------------" << endl;
 	cout << response << endl;
 	cout << "------------------\n" << endl;
+}
+
+void ATestList::preperForNextTest()
+{
+	cout << "\n\n";
+	cout << "Press Enter to continue to the next test...";
+	cin.ignore();
+	cin.get();
+	system("clear");
+}
+
+void ATestList::RunTestCase(TestCase &config)
+{
+	//act
+	printTestCard(config);
+	if (!connectToServer(config))
+		return;
+	if (!SendRequestToServer(config))
+		return;
+	if (!ReadResponseFromServer(config))
+		return;
+
+	//assert
+	actServerResponse(config);
+	preperForNextTest(); 
 }

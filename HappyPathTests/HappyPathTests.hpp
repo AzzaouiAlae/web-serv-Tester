@@ -6,8 +6,11 @@ class HappyPathTests: public ATestList
 {
 	void GetIndexTest();
 	void GetStaticHtmlTest();
+	void RunAllTests();
+	void GetBinaryFileTest();
+	void GetDirectoryWithTrailingSlashTest();
+	void HeadRequestTest();
 	void performTestCase(int choice);
-	
 public:
 	HappyPathTests();
 	~HappyPathTests();
