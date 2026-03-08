@@ -11,6 +11,7 @@
 #include "ChunkedTransferTests/ChunkedTransferTests.hpp"
 #include "SessionTests/SessionTests.hpp"
 #include "StressTests/StressTests.hpp"
+#include "../PathTests/PathTests.hpp"
 
 class HandlerTestsList {
 	HappyPathTests *_happyPathTests;
@@ -24,6 +25,7 @@ class HandlerTestsList {
 	ChunkedTransferTests   *_chunkedTransferTests;
 	SessionTests           *_sessionTests;
 	StressTests            *_stressTests;
+	PathTests              *_pathTests;
 public:
 	HandlerTestsList();
 	~HandlerTestsList();
