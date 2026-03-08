@@ -17,6 +17,7 @@ void HandlerTestsList::CreateTests() {
 	_chunkedTransferTests   = new ChunkedTransferTests();
 	_sessionTests           = new SessionTests();
 	_stressTests            = new StressTests();
+	_pathTests              = new PathTests();
 }
 
 HandlerTestsList::~HandlerTestsList() {
