@@ -1,5 +1,4 @@
 #include "PathTests.hpp"
-#include "../Colors/Colors.hpp"
 
 PathTests::PathTests() : ATestList("Path Tests")
 {

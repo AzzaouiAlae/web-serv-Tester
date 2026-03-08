@@ -113,16 +113,16 @@ void HappyPathTests::PostSimpleTextTest()
 	string body = "Hello, World!";
 	string contentLength = to_string(body.size());
 
-	testCase.request = "POST /upload HTTP/1.1\r\n"
+	testCase.request = "POST /upload/delete_me.txt HTTP/1.1\r\n"
 					   "Host: localhost\r\n"
 					   "Content-Type: text/plain\r\n"
 					   "Content-Length: " + contentLength + "\r\n"
 					   "\r\n"
 					   + body;
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse = "HTTP/1.1 201 Created";
 
-	testCase.configFileData = "NOTE: Ensure the server has a POST-enabled route for '/upload'. The route must accept 'text/plain' bodies and return 200 OK on success. The 'client_max_body_size' in your config must be at least 13 bytes.";
+	testCase.configFileData = "NOTE: Ensure the server has a POST-enabled route for '/upload'. The route must accept 'text/plain' bodies and return 201 Created on success. The 'client_max_body_size' in your config must be at least 13 bytes.";
 
 	testCase.timeout = 2000;
 
@@ -139,7 +139,7 @@ void HappyPathTests::DeleteExistingFileTest()
 	testCase.host = "localhost";
 
 	// Targeting a file that is expected to exist in the uploads directory
-	testCase.request = "DELETE /uploads/delete_me.txt HTTP/1.1\r\n"
+	testCase.request = "DELETE /upload/delete_me.txt HTTP/1.1\r\n"
 					   "Host: localhost\r\n"
 					   "\r\n";
 
@@ -183,7 +183,7 @@ void HappyPathTests::GetImageFileTest()
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
-	testCase.request = "GET /images/test.png HTTP/1.1\r\n"
+	testCase.request = "GET /images/test.jpg HTTP/1.1\r\n"
 					   "Host: localhost\r\n"
 					   "\r\n";
 
@@ -205,7 +205,7 @@ void HappyPathTests::GetLargeHtmlTest()
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
-	testCase.request = "GET /large.html HTTP/1.1\r\n"
+	testCase.request = "GET /large.htm HTTP/1.1\r\n"
 					   "Host: localhost\r\n"
 					   "\r\n";
 
@@ -218,92 +218,54 @@ void HappyPathTests::GetLargeHtmlTest()
 	RunTestCase(testCase);
 }
 
-void HappyPathTests::PostUploadTextFileTest()
-{
-	// arrange
-	TestCase testCase;
-	testCase.name = "Post Upload Text File Test";
-	testCase.description = "Test to check if the server correctly handles a multipart/form-data POST request uploading a plain text file.";
-	testCase.port = "1025";
-	testCase.host = "localhost";
-
-	// Multipart boundary and body construction
-	// Each \r\n is exactly 2 bytes — content length must match precisely
-	string boundary    = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-	string contentDisp = "Content-Disposition: form-data; name=\"file\"; filename=\"upload_test.txt\"";
-	string contentType = "Content-Type: text/plain";
-	string fileContent = "This is a test upload file.\n";
-
-	string body =
-		"--" + boundary + "\r\n"
-		+ contentDisp + "\r\n"
-		+ contentType + "\r\n"
-		+ "\r\n"
-		+ fileContent + "\r\n"
-		+ "--" + boundary + "--\r\n";
-
-	string contentLength = to_string(body.size());
-
-	testCase.request =
-		"POST /upload HTTP/1.1\r\n"
-		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
-		"Content-Length: " + contentLength + "\r\n"
-		"\r\n"
-		+ body;
-
-	testCase.expectedResponse = "HTTP/1.1 201 Created";
-
-	testCase.configFileData = "NOTE: The server must have a POST route for '/upload' that accepts multipart/form-data. On successful file save it should return 201 Created. Ensure 'client_max_body_size' is large enough and the upload directory is writable by the server process.";
-
-	testCase.timeout = 2000;
-
-	RunTestCase(testCase);
-}
-
 void HappyPathTests::PostUploadBinaryFileTest()
 {
 	// arrange
 	TestCase testCase;
 	testCase.name = "Post Upload Binary File Test";
-	testCase.description = "Test to check if the server correctly handles a multipart/form-data POST request uploading a binary file (simulated PNG header bytes).";
+	testCase.description = "Test to check if the server correctly handles a POST request uploading a binary file (simulated PNG header bytes).";
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
-	// Simulated minimal PNG-like binary payload (first 8 bytes of a valid PNG signature)
-	// Using string constructor with explicit length to safely embed null bytes
-	string boundary    = "----WebKitFormBoundary9aB3cD4eF5gH6iJ";
-	string contentDisp = "Content-Disposition: form-data; name=\"file\"; filename=\"upload_test.png\"";
-	string contentType = "Content-Type: image/png";
-
 	// PNG magic bytes: \x89PNG\r\n\x1a\n followed by minimal padding
-	string fileContent = string("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR", 21);
+	string body = string("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR", 21);
 
-	string bodyPrefix =
-		"--" + boundary + "\r\n"
-		+ contentDisp + "\r\n"
-		+ contentType + "\r\n"
-		+ "\r\n";
-
-	string bodySuffix =
-		"\r\n"
-		"--" + boundary + "--\r\n";
-
-	// Assemble with explicit sizes to preserve embedded null bytes
-	string body = bodyPrefix + fileContent + bodySuffix;
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload HTTP/1.1\r\n"
+		"POST /upload/image.png HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
-		"Content-Length: " + contentLength + "\r\n"
+		"Content-Length: " + contentLength + "\r\n" 
+		"Content-Type: image/png\r\n"
 		"\r\n"
 		+ body;
 
 	testCase.expectedResponse = "HTTP/1.1 201 Created";
 
 	testCase.configFileData = "NOTE: This test sends a binary payload containing null bytes (\\x00). The server's multipart parser MUST NOT use string functions like strstr() or std::string::find() on the raw body if it relies on null-termination. Use memmem() or size-aware search instead. The upload directory must be writable.";
+
+	testCase.timeout = 2000;
+
+	RunTestCase(testCase);
+}
+
+void HappyPathTests::DeleteBinaryFileTest()
+{
+	// arrange
+	TestCase testCase;
+	testCase.name = "Delete Binary File Test";
+	testCase.description = "Test to check if the server correctly handles a DELETE request and removes an existing resource.";
+	testCase.port = "1025";
+	testCase.host = "localhost";
+
+	// Targeting a file that is expected to exist in the uploads directory
+	testCase.request = "DELETE /upload/image.png HTTP/1.1\r\n"
+					   "Host: localhost\r\n"
+					   "\r\n";
+
+	testCase.expectedResponse = "HTTP/1.1 204 No Content";
+
+	testCase.configFileData = "NOTE: Before running this test, ensure a file named 'image.png' exists inside the server's '/uploads' directory. The route for '/uploads' must have the DELETE method allowed in the config. On success the server must return 204 No Content with no body.";
 
 	testCase.timeout = 2000;
 
@@ -344,7 +306,7 @@ void HappyPathTests::AddAllTests()
 	_testFunctions.push_back( make_pair("Get Css File Test",                  (void (ATestList::*)())&HappyPathTests::GetCssFileTest) );
 	_testFunctions.push_back( make_pair("Get Image File Test",                (void (ATestList::*)())&HappyPathTests::GetImageFileTest) );
 	_testFunctions.push_back( make_pair("Get Large Html Test",                (void (ATestList::*)())&HappyPathTests::GetLargeHtmlTest) );
-	_testFunctions.push_back( make_pair("Post Upload Text File Test",         (void (ATestList::*)())&HappyPathTests::PostUploadTextFileTest) );
 	_testFunctions.push_back( make_pair("Post Upload Binary File Test",       (void (ATestList::*)())&HappyPathTests::PostUploadBinaryFileTest) );
 	_testFunctions.push_back( make_pair("Get Alternate Port Test",            (void (ATestList::*)())&HappyPathTests::GetAlternatePortTest) );
+	_testFunctions.push_back( make_pair("Delete Binary File Test",            (void (ATestList::*)())&HappyPathTests::DeleteBinaryFileTest) );
 }

@@ -292,9 +292,8 @@ void SessionTests::HttpCookieEnvVarTest()
 	string sessionId = extractCookieValue(setupCase.response, SESSION_COOKIE_NAME);
 	if (sessionId.empty())
 	{
-		cerr << "\033[31m" << "HTTP Cookie Env Var Test failed: "
-		     << "could not extract session ID from step 1 response. "
-		     << "Is Set-Cookie being issued?\033[0m" << endl;
+		CLI::printError("HTTP Cookie Env Var Test failed: could not extract session ID from step 1 response.");
+		CLI::printHint("Is Set-Cookie being issued?");
 		return;
 	}
 
@@ -450,8 +449,7 @@ void SessionTests::SessionDataStoredTest()
 	string sessionId = extractCookieValue(setupCase.response, SESSION_COOKIE_NAME);
 	if (sessionId.empty())
 	{
-		cerr << "\033[31m" << "Session Data Stored Test failed: "
-		     << "could not extract session ID from step 1 response.\033[0m" << endl;
+		CLI::printError("Session Data Stored Test failed: could not extract session ID from step 1 response.");
 		return;
 	}
 
@@ -489,9 +487,8 @@ void SessionTests::SessionDataStoredTest()
 	// was not set — there is no point running step 3.
 	if (writeCase.response.find("WRITE-OK") == string::npos)
 	{
-		cerr << "\033[31m" << "Session Data Stored Test failed at step 2: "
-		     << "session_write.py did not return WRITE-OK. "
-		     << "HTTP_COOKIE may not be set in the CGI environment.\033[0m" << endl;
+		CLI::printError("Session Data Stored Test failed at step 2: session_write.py did not return WRITE-OK.");
+		CLI::printHint("HTTP_COOKIE may not be set in the CGI environment.");
 		return;
 	}
 

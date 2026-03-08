@@ -17,9 +17,9 @@ class HappyPathTests: public ATestList
 	void GetCssFileTest();
 	void GetImageFileTest();
 	void GetLargeHtmlTest();
-	void PostUploadTextFileTest();
 	void PostUploadBinaryFileTest();
 	void GetAlternatePortTest();
+	void DeleteBinaryFileTest();
 
 	void AddAllTests();
 public:

@@ -4,7 +4,7 @@ OBJ = $(SRC:%.cpp=%.o)
 INCLUDES := $(shell find . -name "*.hpp" -exec dirname {} \; | sort -u | awk '{printf "-I%s ", $$1}')
 
 CXX = c++
-CXXFLAGS = $(INCLUDES)  -Wall -Wextra -Werror -g3 #-Ofast
+CXXFLAGS = $(INCLUDES)  -Wall -Wextra -Werror -g3
 NAME = servTester.out
 
 all : $(NAME)

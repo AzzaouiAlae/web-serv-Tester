@@ -32,9 +32,11 @@ int ATestList::getPassedTests() const
 
 void ATestList::printTestCard(TestCase &config)
 {
-	cout << "Test: " << config.name << endl;
-	cout << "Description: " << config.description << endl;
-	cout << "------------------" << endl;
+	cout << CLI::topLine() << endl;
+	cout << CLI::row(string(CLR_NAME) + SYM_ARROW + " " + config.name + RESET) << endl;
+	cout << CLI::midLine() << endl;
+	CLI::printWrapped(cout, config.description, CLR_DIM);
+	cout << CLI::botLine() << endl;
 }
 
 bool ATestList::connectToServer(TestCase &config)
@@ -42,7 +44,7 @@ bool ATestList::connectToServer(TestCase &config)
 	config.socket = Socket::inetConnect(config.host, config.port, SOCK_STREAM);
 	if (config.socket == -1)
 	{
-		cerr << "\033[31m" << "Failed to connect to the server." << "\033[0m" << endl;
+		CLI::printError("Failed to connect to the server.");
 		return false;
 	}
 	config.socketIO = new SocketIO(config.socket);
@@ -56,20 +58,20 @@ bool ATestList::SendRequestToServer(TestCase &config)
 	{
 		int size = multiplexer.epollWait(config.timeout);
 		if (size == -1) {
-			cerr << "\033[31m" << "Failed to wait for events." << "\033[0m" << endl;
+			CLI::printError("Failed to wait for events.");
 			return false;
 		}
 		else if (size == 0) {
-			cerr << "\033[31m" << "Timeout while waiting for EpollOut events." << "\033[0m" << endl;
+			CLI::printError("Timeout while waiting for EpollOut events.");
 			return false;
 		}
 		else if ((multiplexer.eventList[0].events & EPOLLOUT) == 0) {
-			cerr << "\033[31m" << "Send Request Unexpected event type." << "\033[0m" << endl;
+			CLI::printError("Send Request Unexpected event type.");
 			return false;
 		}
 		int sentBytes = config.socketIO->Send((void*)(config.request.c_str() + config.sendedBytes), config.request.size() - config.sendedBytes);
 		if (config.socketIO->errorNumber) {
-			cerr << "\033[31m" << "Failed to send request to the server." << "\033[0m" << endl;
+			CLI::printError("Failed to send request to the server.");
 			return false;
 		}
 		else if (sentBytes > 0)
@@ -85,20 +87,20 @@ bool ATestList::ReadResponseFromServer(TestCase &config)
 	{
 		int size = multiplexer.epollWait(config.timeout);
 		if (size == -1) {
-			cerr << "\033[31m" << "Failed to wait for events." << "\033[0m" << endl;
+			CLI::printError("Failed to wait for events.");
 			return false;
 		}
 		else if (size == 0) {
-			cerr << "\033[31m" << "Timeout while waiting for EpollIn events." << "\033[0m" << endl;
+			CLI::printError("Timeout while waiting for EpollIn events.");
 			return false;
 		}
 		else if ((multiplexer.eventList[0].events & EPOLLIN) == 0) {
-			cerr << "\033[31m" << "Read Response Unexpected event type." << "\033[0m" << endl;
+			CLI::printError("Read Response Unexpected event type.");
 			return false;
 		}
 		int receivedBytes = read(config.socketIO->GetFd(), config.responseBuffer, KBYTE);
 		if (config.socketIO->errorNumber) {
-			cerr << "\033[31m" << "Failed to receive response from the server." << "\033[0m" << endl;
+			CLI::printError("Failed to receive response from the server.");
 			return false;
 		}
 		else if (receivedBytes > 0)
@@ -110,7 +112,6 @@ bool ATestList::ReadResponseFromServer(TestCase &config)
 				break;
 		}
 	}
-	multiplexer.DeleteFromEpoll(config.socketIO);
 	return true;
 }
 
@@ -151,10 +152,10 @@ void ATestList::actServerResponse(TestCase &config)
 		config.passed = true;
 		_passedTests++;
 		_failedTests--;
-		cout << "\033[32m" << config.name << " passed." << "\033[0m" << endl;
+		cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
 	}
 	else {
-		cerr << "\033[31m" << config.name << " failed." << "\033[0m" << endl;
+		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET << endl;
 	}
 	string responseHeader = config.response.substr(0, config.headerLength);
 	printServerResponseHeader(config);
@@ -163,17 +164,20 @@ void ATestList::actServerResponse(TestCase &config)
 void ATestList::printServerResponseHeader(TestCase &config)
 {
 	string responseHeader = config.response.substr(0, config.headerLength);
-	cout << "Server Response:" << endl;
-	cout << "------------------" << endl;
-	cout << responseHeader;
-	cout << "------------------" << endl;
-	cout << "Expected Response: \n" << config.expectedResponse << endl;
+	cout << endl;
+	cout << CLI::topLine() << endl;
+	cout << CLI::row(string(CLR_HEADER) + SYM_RAQUO + " Server Response" + RESET) << endl;
+	cout << CLI::midLine() << endl;
+	CLI::printLines(cout, responseHeader, CLR_DIM);
+	cout << CLI::midLine() << endl;
+	CLI::printWrapped(cout, string("Expected: ") + config.expectedResponse, CLR_WARN);
+	cout << CLI::botLine() << endl;
 }
 
 void ATestList::preperForNextTest()
 {
-	cout << "\n";
-	cout << "Press Enter to continue to the next test...";
+	cout << endl;
+	cout << CLR_PROMPT << "  " << SYM_ARROW << " Press Enter to continue..." << RESET;
 	readInput();
 	system("clear");
 }
@@ -184,23 +188,31 @@ void ATestList::RunTestCase(TestCase &config)
 	printTestCard(config);
 	if (!connectToServer(config))
 		return;
-	if (!SendRequestToServer(config))
+	if (!SendRequestToServer(config)) {
+		multiplexer.DeleteFromEpoll(config.socketIO);
 		return;
-	if (!ReadResponseFromServer(config))
+	}
+	if (!ReadResponseFromServer(config)) {
+		multiplexer.DeleteFromEpoll(config.socketIO);
 		return;
-
+	}
 	//assert
 	actServerResponse(config);
+	multiplexer.DeleteFromEpoll(config.socketIO);
 }
 
 void ATestList::PrintTestResult()
 {
-	cout << "\nTests Run: " << _testFunctions.size() << endl;
-	cout << "Test Result: "
-		<< "\033[32m" << _passedTests << " passed" << "\033[0m"
-		<< ", "
-		<< "\033[31m" << _failedTests << " failed" << "\033[0m"
-		<< "." << endl;
+	int total = (int)_testFunctions.size();
+	cout << endl;
+	cout << CLI::topLine() << endl;
+	cout << CLI::row(string(CLR_TITLE) + SYM_STAR + " Test Results" + RESET) << endl;
+	cout << CLI::midLine() << endl;
+	cout << CLI::row(string(CLR_DIM) + "Total: " + RESET + CLR_NAME + to_string(total) + RESET) << endl;
+	cout << CLI::row(CLI::progressBar(_passedTests, total)) << endl;
+	cout << CLI::row(string(CLR_PASS) + SYM_CHECK + " Passed: " + to_string(_passedTests) + RESET
+		+ "    " + CLR_FAIL + SYM_CROSS + " Failed: " + to_string(_failedTests) + RESET) << endl;
+	cout << CLI::botLine() << endl;
 }
 
 void ATestList::ResetTestResults()
@@ -222,10 +234,10 @@ int ATestList::readIntegerInput()
 	try {
 		return stoi(input);
 	} catch (const invalid_argument&) {
-		cerr << "Invalid input. Please enter a valid integer." << endl;
+		cerr << CLR_WARN << "  " << SYM_WARN << " Invalid input. Please enter a number." << RESET << endl;
 		return readIntegerInput();
 	} catch (const out_of_range&) {
-		cerr << "Input out of range. Please enter a valid integer." << endl;
+		cerr << CLR_WARN << "  " << SYM_WARN << " Input out of range." << RESET << endl;
 		return readIntegerInput();
 	}
 }
@@ -236,16 +248,21 @@ void ATestList::ShowTestsList()
 	size_t i = 0;
 	while (true)
 	{
-		cout << getName() << ":" << endl;
-		cout << "------------------" << endl;
-		cout << "0. Run All Tests" << endl;
+		cout << CLI::topLine() << endl;
+		cout << CLI::row(string(CLR_MENU_CAT) + SYM_GEAR + " " + getName() + RESET) << endl;
+		cout << CLI::midLine() << endl;
+		cout << CLI::row(string(CLR_MENU_NUM) + "  0" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_PASS + "Run All Tests" + RESET) << endl;
 		for (i = 0; i < _testFunctions.size(); i++)
 		{
-			cout << i + 1 << ". " << _testFunctions[i].first << endl;
+			string num = to_string(i + 1);
+			if (num.size() < 2) num = " " + num;
+			cout << CLI::row(string(CLR_MENU_NUM) + "  " + num + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + _testFunctions[i].first + RESET) << endl;
 		}
-		cout << i + 1 << ". Return" << endl;
-		cout << "------------------" << endl;
-		cout << "Enter your choice: ";
+		string retNum = to_string(i + 1);
+		if (retNum.size() < 2) retNum = " " + retNum;
+		cout << CLI::row(string(CLR_MENU_NUM) + "  " + retNum + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_WARN + "Return" + RESET) << endl;
+		cout << CLI::botLine() << endl;
+		cout << CLR_PROMPT << "  " << SYM_ARROW << " Choice: " << RESET;
 		choice = readIntegerInput();
 		if (choice == _testFunctions.size() + 1) {
 			break;
@@ -261,7 +278,7 @@ void ATestList::RunAllTests()
 	for (size_t i = 0; i < _testFunctions.size(); i++)
 	{
 		(this->*(_testFunctions[i].second))();
-		cout << "====================================\n" << endl;
+		cout << endl << CLI::thickSeparator() << endl << endl;
 	}
 	
 }
@@ -273,7 +290,7 @@ void ATestList::performTestCase(int choice)
 		PrintTestResult();
 	}
 	else if (choice < 0 || choice > static_cast<int>(_testFunctions.size())) {
-		cerr << "Invalid choice. Please try again." << endl;
+		cerr << CLR_WARN << "  " << SYM_WARN << " Invalid choice. Please try again." << RESET << endl;
 	}
 	else
 	{

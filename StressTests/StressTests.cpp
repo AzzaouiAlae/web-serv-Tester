@@ -192,8 +192,8 @@ void StressTests::RapidSequentialRequestsTest()
 	const string request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
 	const string expected = "HTTP/1.1 200 OK";
 
-	cout << "Stress Test 1 — Rapid Sequential Requests ("
-	     << SEQUENTIAL_COUNT << " iterations)..." << endl;
+	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Rapid Sequential Requests" << RESET
+	     << CLR_DIM << " (" << SEQUENTIAL_COUNT << " iterations)" << RESET << endl;
 
 	int  successCount = 0;
 	int  firstFailAt  = -1;
@@ -245,10 +245,8 @@ void StressTests::RapidSequentialRequestsTest()
 	// Diagnosis hint printed regardless of pass/fail
 	if (firstFailAt != -1)
 	{
-		cerr << "  First failure at iteration " << firstFailAt
-		     << " of " << SEQUENTIAL_COUNT << "." << endl;
-		cerr << "  Likely cause: file descriptor leak — server runs out of fds "
-		        "after repeated open/close cycles." << endl;
+		CLI::printHint("First failure at iteration " + to_string(firstFailAt) + " of " + to_string(SEQUENTIAL_COUNT) + ".");
+		CLI::printHint("Likely cause: file descriptor leak - server runs out of fds after repeated open/close cycles.");
 	}
 }
 
@@ -278,8 +276,8 @@ void StressTests::ConcurrentConnectionsTest()
 	const string request  = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
 	const string expected = "HTTP/1.1 200 OK";
 
-	cout << "Stress Test 2 — Concurrent Connections ("
-	     << CONCURRENT_CLIENTS << " simultaneous clients)..." << endl;
+	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Concurrent Connections" << RESET
+	     << CLR_DIM << " (" << CONCURRENT_CLIENTS << " simultaneous clients)" << RESET << endl;
 
 	// Fork all children before any wait so they are truly concurrent
 	vector<pid_t> pids;
@@ -290,7 +288,7 @@ void StressTests::ConcurrentConnectionsTest()
 		pid_t pid = fork();
 		if (pid < 0)
 		{
-			cerr << "fork() failed at child " << i << endl;
+			cerr << CLR_WARN << "  " << SYM_WARN << " fork() failed at child " << i << RESET << endl;
 			// Children already forked must still be reaped below
 			break;
 		}
@@ -343,10 +341,8 @@ void StressTests::ConcurrentConnectionsTest()
 
 	if (failedChildren > 0)
 	{
-		cerr << "  " << failedChildren << " of " << pids.size()
-		     << " concurrent clients did not receive 200 OK." << endl;
-		cerr << "  Likely cause: server accept() loop does not call accept() "
-		        "until EPOLLIN fires again, or per-connection state is shared." << endl;
+		CLI::printHint(to_string(failedChildren) + " of " + to_string((int)pids.size()) + " concurrent clients did not receive 200 OK.");
+		CLI::printHint("Likely cause: server accept() loop does not call accept() until EPOLLIN fires again, or per-connection state is shared.");
 	}
 }
 
@@ -376,8 +372,8 @@ void StressTests::SlowClientTest()
 	const string request  = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
 	const string expected = "HTTP/1.1 200 OK";
 
-	cout << "Stress Test 3 — Slow Client (1 byte per "
-	     << SLOW_BYTE_DELAY_US / 1000 << " ms)..." << endl;
+	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Slow Client" << RESET
+	     << CLR_DIM << " (1 byte per " << SLOW_BYTE_DELAY_US / 1000 << " ms)" << RESET << endl;
 
 	string responseOut;
 	bool   gotResponse = false;
@@ -471,10 +467,8 @@ void StressTests::SlowClientTest()
 
 	if (!gotResponse)
 	{
-		cerr << "  Server closed the connection before the request was complete." << endl;
-		cerr << "  Likely cause: ServerTask discards the fd after the first "
-		        "partial recv() instead of keeping it in epoll to accumulate "
-		        "more data." << endl;
+		CLI::printHint("Server closed the connection before the request was complete.");
+		CLI::printHint("Likely cause: ServerTask discards the fd after the first partial recv() instead of keeping it in epoll to accumulate more data.");
 	}
 }
 
@@ -511,8 +505,8 @@ void StressTests::LargeRequestHeadersTest()
 		"X-Stress-Header: " + bigValue + "\r\n"
 		"\r\n";
 
-	cout << "Stress Test 4 — Large Request Header ("
-	     << LARGE_HEADER_SIZE << " byte value)..." << endl;
+	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Large Request Header" << RESET
+	     << CLR_DIM << " (" << LARGE_HEADER_SIZE << " byte value)" << RESET << endl;
 
 	string response;
 	bool   ok = rawRequest(host, port, request, response, RAW_TIMEOUT_MS);
@@ -551,9 +545,8 @@ void StressTests::LargeRequestHeadersTest()
 		string statusLine = (lineEnd != string::npos)
 		                    ? response.substr(0, lineEnd)
 		                    : response.substr(0, 40);
-		cout << "  Server responded: " << statusLine << endl;
-		cout << "  (200 = no limit configured; 431 = limit enforced; "
-		        "400 = rejected as malformed)" << endl;
+		CLI::printInfo("Server responded: " + statusLine);
+		CLI::printHint("200 = no limit configured; 431 = limit enforced; 400 = rejected as malformed");
 	}
 }
 
@@ -584,7 +577,7 @@ void StressTests::ConnectionAfterErrorTest()
 	const string port    = "1025";
 	const string expected = "HTTP/1.1 200 OK";
 
-	cout << "Stress Test 5 — Connection After Error Response..." << endl;
+	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Connection After Error Response" << RESET << endl;
 
 	// ── Step 1: trigger a 404 ────────────────────────────────────────────────
 	string errorRequest =
@@ -598,7 +591,7 @@ void StressTests::ConnectionAfterErrorTest()
 	string errStatus = (errLine != string::npos)
 	                   ? errorResponse.substr(0, errLine)
 	                   : "(no response)";
-	cout << "  Step 1 (error trigger): " << errStatus << endl;
+	CLI::printInfo("Step 1 (error trigger): " + errStatus);
 
 	// ── Step 2: verify server still alive on a new connection ────────────────
 	string okRequest =
@@ -636,12 +629,9 @@ void StressTests::ConnectionAfterErrorTest()
 
 	if (!ok || okResponse.find(expected) == string::npos)
 	{
-		cerr << "  Step 1 produced: " << errStatus << endl;
-		cerr << "  Step 2 (should be 200 OK) produced: "
-		     << okResponse.substr(0, 80) << endl;
-		cerr << "  Likely cause: the 404 error path left the server fd in a "
-		        "broken state, or a crash occurred during error response "
-		        "construction." << endl;
+		CLI::printHint("Step 1 produced: " + errStatus);
+		CLI::printHint("Step 2 (should be 200 OK) produced: " + okResponse.substr(0, 80));
+		CLI::printHint("Likely cause: the 404 error path left the server fd in a broken state, or a crash occurred during error response construction.");
 	}
 }
 

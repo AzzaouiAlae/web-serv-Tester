@@ -34,39 +34,49 @@ void TestCLI::RunAllTests()
 
 void TestCLI::PrintTestResult()
 {
-	cout << "\nTests Run: " << _testsCount << endl;
-	cout << "Test Result: "
-		<< "\033[32m" << _passedTests << " passed" << "\033[0m"
-		<< ", "
-		<< "\033[31m" << _failedTests << " failed" << "\033[0m"
-		<< "." << endl;
+	cout << endl;
+	cout << CLI::topLine() << endl;
+	cout << CLI::row(string(CLR_TITLE) + SYM_STAR + " Overall Test Results" + RESET) << endl;
+	cout << CLI::midLine() << endl;
+	cout << CLI::row(string(CLR_DIM) + "Total: " + RESET + CLR_NAME + to_string(_testsCount) + RESET) << endl;
+	cout << CLI::row(CLI::progressBar(_passedTests, _testsCount)) << endl;
+	cout << CLI::row(string(CLR_PASS) + SYM_CHECK + " Passed: " + to_string(_passedTests) + RESET
+		+ "    " + CLR_FAIL + SYM_CROSS + " Failed: " + to_string(_failedTests) + RESET) << endl;
+	cout << CLI::botLine() << endl;
 }
 
 void TestCLI::PrintScreen()
 {
 	int choice = 0;
-	cout << "Tests List:" << endl;
-	cout << "------------------" << endl;
-	cout << "0. Run All Tests" << endl;
+	CLI::printBanner();
+	cout << endl;
+	cout << CLI::topLine() << endl;
+	cout << CLI::row(string(CLR_TITLE) + SYM_GEAR + " Test Suites" + RESET) << endl;
+	cout << CLI::midLine() << endl;
+	cout << CLI::row(string(CLR_MENU_NUM) + "  0" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_PASS + "Run All Tests" + RESET) << endl;
 	size_t i;
 	for(i = 0; i < _testLists.size(); i++)
 	{
-		cout << i + 1 << ". " << _testLists[i]->getName() << endl;
+		string num = to_string(i + 1);
+		if (num.size() < 2) num = " " + num;
+		cout << CLI::row(string(CLR_MENU_NUM) + "  " + num + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + _testLists[i]->getName() + RESET) << endl;
 	}
-	cout << i + 1 << ". Exit" << endl;
-	cout << "------------------" << endl;
-	cout << "Enter the number of the test list you want to run: ";
+	string exitNum = to_string(i + 1);
+	if (exitNum.size() < 2) exitNum = " " + exitNum;
+	cout << CLI::row(string(CLR_MENU_NUM) + "  " + exitNum + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_FAIL + "Exit" + RESET) << endl;
+	cout << CLI::botLine() << endl;
+	cout << CLR_PROMPT << "  " << SYM_ARROW << " Choice: " << RESET;
 	choice = ATestList::readIntegerInput();
 	if (choice == 0) {
 		RunAllTests();
 	}
 	else if(choice < 1 || choice > (int)_testLists.size() + 1)
 	{
-		cout << "Invalid choice" << endl;
+		cerr << CLR_WARN << "  " << SYM_WARN << " Invalid choice." << RESET << endl;
 	}
 	else if(choice == (int)_testLists.size() + 1)
 	{
-		cout << "Exiting..." << endl;
+		cout << endl << CLR_DIM << "  Goodbye!" << RESET << endl << endl;
 		exit(0);
 	}
 	else
@@ -74,4 +84,5 @@ void TestCLI::PrintScreen()
 		system("clear");
 		_testLists[choice - 1]->ShowTestsList();
 	}
+	system("clear");
 }
