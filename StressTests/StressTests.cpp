@@ -1,5 +1,4 @@
 #include "StressTests.hpp"
-
 // ─────────────────────────────────────────────────────────────────────────────
 // WHY STRESS TESTS BYPASS THE ATESTLIST INFRASTRUCTURE
 //
@@ -144,10 +143,11 @@ void StressTests::evaluateStressResult(const string &testName,
 	result.response         = syntheticResponse;
 	// Set headerLength so actServerResponse can call substr(0, headerLength)
 	// without reading past the synthetic string.
-	result.headerLength     = min(syntheticResponse.size(),
-	                              syntheticResponse.find("\r\n\r\n") != string::npos
-	                              ? syntheticResponse.find("\r\n\r\n") + 4
-	                              : syntheticResponse.size());
+	result.headerLength     = 
+		min(syntheticResponse.size(),
+		syntheticResponse.find("\r\n\r\n") != string::npos
+		? syntheticResponse.find("\r\n\r\n") + 4
+		: syntheticResponse.size());
 	printTestCard(result);
 	actServerResponse(result);
 }
