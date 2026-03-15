@@ -3,7 +3,7 @@
         {
             "type": "shell",
             "label": "Compile project (make re)",
-            "command": "make re",
+            "command": "make",
             "args": [],
             "options": {
                 "cwd": "${workspaceFolder}"

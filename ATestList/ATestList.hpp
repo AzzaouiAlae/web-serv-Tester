@@ -9,8 +9,8 @@ struct TestCase {
 	string port;
 	string host;
 	string request;
-	string expectedResponse;
-	string configFileData;
+	vector<string> expectedResponse;
+	string configurationsForTestCase;
 	int timeout;
 	int socket;
 	SocketIO *socketIO;
@@ -38,10 +38,14 @@ class ATestList {
 protected:
 	int _failedTests;
 	int _passedTests;
+	bool _showSingleTestDetails;
 	vector<pair<string, void (ATestList::*)()> > _testFunctions;
 	Multiplexer multiplexer;
 	static bool GetContentLength(string &response, size_t &contentLength);
 	static bool GetResponseHeaderLength(string &response, size_t &headerLength);
+	static bool IsChunkedTransferEncoding(const string &response, size_t headerLength);
+	static bool HasChunkedTerminator(const string &response, size_t headerLength);
+	static bool DecodeChunkedResponseBody(string &response, size_t headerLength);
 	bool SendRequestToServer(TestCase &config);
 	bool ReadResponseFromServer(TestCase &config);
 	bool connectToServer(TestCase &config);
@@ -49,14 +53,18 @@ protected:
 	void actServerResponse(TestCase &config);
 	void printServerResponseHeader(TestCase &config);
 	void RunTestCase(TestCase &config);
-	void PrintTestResult();
 	void ResetTestResults();
+	void rePrintTest(TestCase &config);
 public:
+	void PrintTestResult();
+	static long CurrentTime();
+	static string GetRandem();
 	int getFailedTests() const;
 	int getPassedTests() const;
 	static void preperForNextTest();
 	static int readIntegerInput();
 	static string readInput();
+	static vector<int> parseChoices(const string &input);
 	virtual void AddAllTests() = 0;
 	virtual void performTestCase(int choice);
 	virtual void RunAllTests();

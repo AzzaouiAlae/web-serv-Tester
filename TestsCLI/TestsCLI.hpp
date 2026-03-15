@@ -11,8 +11,11 @@ class TestCLI {
 	int _passedTests;
 	int _testsCount;
 	void RunAllTests();
+	void RunSelectedTests(vector<int> &choices);
 	void PrintScreen();
 	void PrintTestResult();
+	vector<int> ReadChoices();
+	void HandleChoices(vector<int> &choices);
 public:
     TestCLI();
     ~TestCLI();

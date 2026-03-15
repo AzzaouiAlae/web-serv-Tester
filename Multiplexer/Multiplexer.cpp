@@ -94,8 +94,13 @@ bool Multiplexer::ChangeToEpollOneShot(SocketIO *fd)
 
 bool Multiplexer::DeleteFromEpoll(SocketIO *fd)
 {
-	count--;
-	return epoll_ctl(epollFd, EPOLL_CTL_DEL, fd->GetFd(), NULL);
+	if (fd == NULL)
+		return false;
+	if (epoll_ctl(epollFd, EPOLL_CTL_DEL, fd->GetFd(), NULL) == -1)
+		return false;
+	if (count > 0)
+		count--;
+	return true;
 }
 
 void Multiplexer::ChangeToEpollInOut(SocketIO *fd)

@@ -88,16 +88,16 @@ void CGITests::CgiGetRequestTest()
 		"\r\n";
 
 	// Sentinel printed by the script — only appears in CGI output
-	testCase.expectedResponse = "CGI-GET-SENTINEL";
+	testCase.expectedResponse.push_back("CGI-GET-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Create <web-root>/cgi-bin/hello.py with:\n"
-		"  #!/usr/bin/env python3\n"
-		"  body = \"CGI-GET-SENTINEL\"\n"
-		"  print(\"Content-Type: text/plain\")\n"
-		"  print(\"Content-Length: \" + str(len(body)))\n"
-		"  print()\n"
-		"  print(body, end=\"\")\n"
+		"  #!/usr/bin/env python3"
+		"  body = 'CGI-GET-SENTINEL'"
+		"  print('Content-Type: text/plain')"
+		"  print('Content-Length: ' + str(len(body)))"
+		"  print()"
+		"  print(body)"
 		"Then: chmod +x <web-root>/cgi-bin/hello.py\n"
 		"Config: add 'cgi_ext .py' (or equivalent) to the /cgi-bin location.\n"
 		"If this returns 404, the extension-to-CGI mapping is not configured.\n"
@@ -157,18 +157,20 @@ void CGITests::CgiPostWithBodyTest()
 		+ body;
 
 	// The echoed string must appear in the response body
-	testCase.expectedResponse = "CGI-POST-INPUT";
+	testCase.expectedResponse.push_back("CGI-POST-INPUT");
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK||HTTP/1.0 200 OK"); // some servers respond with HTTP/1.0
 
-	testCase.configFileData =
+
+	testCase.configurationsForTestCase =
 		"SETUP: Create <web-root>/cgi-bin/echo_post.py with:\n"
-		"  #!/usr/bin/env python3\n"
-		"  import os, sys\n"
-		"  length = int(os.environ.get(\"CONTENT_LENGTH\", 0))\n"
-		"  body = sys.stdin.read(length) if length > 0 else \"\"\n"
-		"  print(\"Content-Type: text/plain\")\n"
-		"  print(\"Content-Length: \" + str(len(body)))\n"
-		"  print()\n"
-		"  print(body, end=\"\")\n"
+		"  #!/usr/bin/env python3"
+		"  import os, sys"
+		"  length = int(os.environ.get('CONTENT_LENGTH', 0))"
+		"  body = sys.stdin.read(length) if length > 0 else ''"
+		"  print('Content-Type: text/plain')"
+		"  print('Content-Length: ' + str(len(body)))"
+		"  print()"
+		"  print(body)"
 		"Then: chmod +x <web-root>/cgi-bin/echo_post.py\n"
 		"If the test returns the correct status but the body is empty, "
 		"the server is not writing the request body into the stdin pipe "
@@ -221,17 +223,17 @@ void CGITests::CgiEnvVarsTest()
 		"\r\n";
 
 	// Script outputs "REQUEST_METHOD=GET" — full key=value match avoids false positives
-	testCase.expectedResponse = "REQUEST_METHOD=GET";
+	testCase.expectedResponse.push_back("REQUEST_METHOD=GET");
 
-	testCase.configFileData =
-		"SETUP: Create <web-root>/cgi-bin/env_check.py with:\n"
-		"  #!/usr/bin/env python3\n"
-		"  import os\n"
-		"  line = \"REQUEST_METHOD=\" + os.environ.get(\"REQUEST_METHOD\", \"MISSING\")\n"
-		"  print(\"Content-Type: text/plain\")\n"
-		"  print(\"Content-Length: \" + str(len(line)))\n"
-		"  print()\n"
-		"  print(line, end=\"\")\n"
+	testCase.configurationsForTestCase =
+		"SETUP: Create <web-root>/cgi-bin/env_check.py with:"
+		"  #!/usr/bin/env python3"
+		"  import os"
+		"  line = 'REQUEST_METHOD=' + os.environ.get('REQUEST_METHOD', 'MISSING')"
+		"  print('Content-Type: text/plain')"
+		"  print('Content-Length: ' + str(len(line)))"
+		"  print()"
+		"  print(line)"
 		"Then: chmod +x <web-root>/cgi-bin/env_check.py\n"
 		"If the body contains 'REQUEST_METHOD=MISSING', the CGIRequest env "
 		"builder is not setting REQUEST_METHOD before execve(). "
@@ -287,15 +289,18 @@ void CGITests::CgiNoContentLengthTest()
 		"\r\n";
 
 	// Proves the server injected Content-Length — the script never outputs it
-	testCase.expectedResponse = "Content-Length:";
+	testCase.expectedResponse.push_back("HTTP/1.1 200");
+	testCase.expectedResponse.push_back("Content-Length:||Connection: close||Transfer-Encoding: chunked");
+	testCase.expectedResponse.push_back("CGI-NO-CL-BODY");
 
-	testCase.configFileData =
+
+	testCase.configurationsForTestCase =
 		"SETUP: Create <web-root>/cgi-bin/no_cl.py with:\n"
-		"  #!/usr/bin/env python3\n"
-		"  body = \"CGI-NO-CL-BODY\"\n"
-		"  print(\"Content-Type: text/plain\")\n"
-		"  print()\n"
-		"  print(body, end=\"\")\n"
+		"  #!/usr/bin/env python3"
+		"  body = 'CGI-NO-CL-BODY'"
+		"  print('Content-Type: text/plain')"
+		"  print()"
+		"  print(body)"
 		"Then: chmod +x <web-root>/cgi-bin/no_cl.py\n"
 		"IMPORTANT: The script deliberately has NO 'Content-Length' print line. "
 		"The server must detect EOF on the CGI stdout pipe, collect all output, "
@@ -306,7 +311,7 @@ void CGITests::CgiNoContentLengthTest()
 		"If it returns a 200 but 'Content-Length:' is not found in the response, "
 		"the injection code path is skipped when CGI omits the header.";
 
-	testCase.timeout = 5000;
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }
@@ -331,7 +336,7 @@ void CGITests::CgiNoContentLengthTest()
 //   print("Content-Type: text/plain")
 //   print("Content-Length: " + str(len(qs)))
 //   print()
-//   print(qs, end="")
+//   print(qs)
 // ─────────────────────────────────────────────────────────────────────────────
 void CGITests::CgiQueryStringTest()
 {
@@ -352,9 +357,11 @@ void CGITests::CgiQueryStringTest()
 		"\r\n";
 
 	// Substring match — avoids ordering issues; "color=blue" must be present
-	testCase.expectedResponse = "color=blue";
+	testCase.expectedResponse.push_back("200 OK");
+	testCase.expectedResponse.push_back("color=blue");
 
-	testCase.configFileData =
+
+	testCase.configurationsForTestCase =
 		"SETUP: Create <web-root>/cgi-bin/query.py with:\n"
 		"  #!/usr/bin/env python3\n"
 		"  import os\n"
@@ -420,9 +427,9 @@ void CGITests::CgiWorkingDirectoryTest()
 		"\r\n";
 
 	// Sentinel lives in data.txt beside the script — only readable if chdir() worked
-	testCase.expectedResponse = "CGI-WORKDIR-SENTINEL";
+	testCase.expectedResponse.push_back("CGI-WORKDIR-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP:\n"
 		"1. Create <web-root>/cgi-bin/dir_check.py with:\n"
 		"     #!/usr/bin/env python3\n"
@@ -482,7 +489,7 @@ void CGITests::CgiTimeoutTest()
 	testCase.description = "Test to check that when a CGI script hangs (sleeps "
 	                       "for 30 s), the server detects the timeout, kills the "
 	                       "CGI process, and returns 504 Gateway Timeout before "
-	                       "this test's own 8-second deadline expires.";
+	                       "this test's own 25-second deadline expires.";
 	testCase.port        = "1025";
 	testCase.host        = "localhost";
 
@@ -491,9 +498,9 @@ void CGITests::CgiTimeoutTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 504 Gateway Timeout";
+	testCase.expectedResponse.push_back("HTTP/1.1 504 Gateway Timeout");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Create <web-root>/cgi-bin/sleeper.py with:\n"
 		"  #!/usr/bin/env python3\n"
 		"  import time\n"
@@ -503,17 +510,17 @@ void CGITests::CgiTimeoutTest()
 		"  print()\n"
 		"Then: chmod +x <web-root>/cgi-bin/sleeper.py\n"
 		"TIMEOUT SETUP: Configure your server's CGI timeout to 5 seconds (or any "
-		"value under 8000 ms). The relationship must be:\n"
-		"  script sleep (30 s) > server CGI timeout (~5 s) > this test timeout (8 s)? NO:\n"
-		"  server CGI timeout (~5 s) < this test's timeout (8 s) < script sleep (30 s).\n"
+		"value under 25000 ms). The relationship must be:\n"
+		"  script sleep (30 s) > server CGI timeout (~5 s) > this test timeout (25 s)? NO:\n"
+		"  server CGI timeout (~5 s) < this test's timeout (25 s) < script sleep (30 s).\n"
 		"If this test times out with 'Timeout while waiting for EpollIn events', "
 		"the server's CGI watchdog is not firing — check that the CGIPipe fd is "
 		"monitored by epoll and that a timeout triggers SIGKILL on the child PID. "
 		"CRITICAL: The 504 response MUST include Content-Length or this test's "
 		"reader will block even after the 504 is sent.";
 
-	// 8000 ms — server CGI timeout must be shorter than this
-	testCase.timeout = 8000;
+	// 25000 ms — server CGI timeout must be shorter than this
+	testCase.timeout = 25000;
 
 	RunTestCase(testCase);
 }

@@ -8,8 +8,9 @@ class ChunkedTransferTests : public ATestList
 	void ChunkedBodyEchoedByCgiTest();
 	void ChunkedBodySizeLimitTest();
 	void ChunkedEmptyBodyTest();
-	void AddAllTests();
+	void ChunkedMultipartTest();
 public:
+	void AddAllTests();
 	ChunkedTransferTests();
 	~ChunkedTransferTests();
 };

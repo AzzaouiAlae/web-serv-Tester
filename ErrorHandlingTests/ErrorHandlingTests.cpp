@@ -32,9 +32,9 @@ void ErrorHandlingTests::GetNonExistentFileTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 404 Not Found";
+	testCase.expectedResponse.push_back("HTTP/1.1 404 Not Found");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: Ensure your server has a default error page configured for 404 "
 		"(e.g. 'error_page 404 /404.html'). The response MUST include a "
 		"Content-Length header so the test reader can detect the end of the "
@@ -69,9 +69,9 @@ void ErrorHandlingTests::GetForbiddenFileTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 403 Forbidden";
+	testCase.expectedResponse.push_back("HTTP/1.1 403 Forbidden");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: Before running this test create a file named 'forbidden.html' "
 		"inside your web root and run: chmod 000 forbidden.html. "
 		"The server must detect the permission error when opening the file and "
@@ -106,9 +106,9 @@ void ErrorHandlingTests::MalformedRequestLineTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 400 Bad Request";
+	testCase.expectedResponse.push_back("HTTP/1.1 400 Bad Request");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: The server's request parser must validate that the request line "
 		"has exactly three tokens (METHOD SP Request-URI SP HTTP-Version CRLF). "
 		"On parse failure it must respond with 400 and a body+Content-Length, "
@@ -143,9 +143,9 @@ void ErrorHandlingTests::UnsupportedMethodTest()
 		"Content-Length: 0\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 501 Not Implemented";
+	testCase.expectedResponse.push_back("HTTP/1.1 501 Not Implemented");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: Any method other than GET, POST and DELETE must result in 501. "
 		"Ensure the AMethod dispatch layer does not silently fall through to a "
 		"GET handler. The response must include Content-Length.";
@@ -177,9 +177,9 @@ void ErrorHandlingTests::HttpVersionMismatchTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 505 HTTP Version Not Supported";
+	testCase.expectedResponse.push_back("HTTP/1.1 505 HTTP Version Not Supported");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: After parsing the request line the server must compare the "
 		"version token against 'HTTP/1.1' (and optionally 'HTTP/1.0'). "
 		"Any other version string must produce 505 with a body+Content-Length. "
@@ -212,9 +212,9 @@ void ErrorHandlingTests::MissingHostHeaderTest()
 		"GET / HTTP/1.1\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 400 Bad Request";
+	testCase.expectedResponse.push_back("HTTP/1.1 400 Bad Request");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: After headers are parsed, validate that the 'Host' header is "
 		"present for any HTTP/1.1 request. Its absence must trigger a 400 "
 		"response with a body and Content-Length before any routing or file "

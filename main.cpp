@@ -2,6 +2,7 @@
 
 int main()
 {
+    system("clear");
     TestCLI test;
     test.run();
 

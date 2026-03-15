@@ -1,18 +1,95 @@
 #include "StressTests.hpp"
+
+namespace {
+
+static void cleanupStressSocket(Multiplexer &multiplexer, TestCase &cfg)
+{
+	if (cfg.socketIO)
+	{
+		multiplexer.DeleteFromEpoll(cfg.socketIO);
+		delete cfg.socketIO;
+		cfg.socketIO = NULL;
+	}
+	cfg.socket = -1;
+}
+
+static bool childConcurrentRequest(const string &host, const string &port,
+	const string &request, string &responseOut, int timeoutMs)
+{
+	responseOut.clear();
+	int fd = Socket::inetConnect(host, port, SOCK_STREAM);
+	if (fd == -1)
+		return false;
+
+	struct timeval tv;
+	tv.tv_sec = timeoutMs / 1000;
+	tv.tv_usec = (timeoutMs % 1000) * 1000;
+	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+	size_t sent = 0;
+	while (sent < request.size())
+	{
+		ssize_t n = send(fd, request.c_str() + sent, request.size() - sent, 0);
+		if (n <= 0)
+		{
+			close(fd);
+			return false;
+		}
+		sent += (size_t)n;
+	}
+
+	char buf[4096];
+	while (true)
+	{
+		ssize_t n = recv(fd, buf, sizeof(buf), 0);
+		if (n <= 0)
+			break;
+		responseOut.append(buf, (size_t)n);
+
+		size_t headerPos = responseOut.find("\r\n\r\n");
+		if (headerPos == string::npos)
+			continue;
+		size_t headerLength = headerPos + 4;
+
+		string loweredHeaders = responseOut.substr(0, headerLength);
+		for (size_t i = 0; i < loweredHeaders.size(); i++)
+			loweredHeaders[i] = (char)tolower((unsigned char)loweredHeaders[i]);
+
+		if (loweredHeaders.find("transfer-encoding:") != string::npos
+			&& loweredHeaders.find("chunked") != string::npos)
+		{
+			if (responseOut.find("0\r\n\r\n", headerLength) != string::npos)
+				break;
+			continue;
+		}
+
+		size_t clPos = loweredHeaders.find("content-length:");
+		if (clPos == string::npos)
+			continue;
+		clPos += strlen("content-length:");
+		while (clPos < loweredHeaders.size() && isspace(loweredHeaders[clPos]))
+			clPos++;
+		size_t clEnd = loweredHeaders.find("\r\n", clPos);
+		if (clEnd == string::npos)
+			continue;
+		size_t contentLength = (size_t)atoi(loweredHeaders.substr(clPos, clEnd - clPos).c_str());
+		if (responseOut.size() >= headerLength + contentLength)
+			break;
+	}
+
+	close(fd);
+	return !responseOut.empty();
+}
+
+}
 // ─────────────────────────────────────────────────────────────────────────────
-// WHY STRESS TESTS BYPASS THE ATESTLIST INFRASTRUCTURE
+// WHY STRESS TESTS NOW USE THE ATESTLIST FLOW
 //
-// ATestList owns one Multiplexer (epoll) instance.  All three protected
-// methods — connectToServer, SendRequestToServer, ReadResponseFromServer —
-// register and deregister file descriptors on that single epoll instance.
-// This is safe for sequential use but becomes a race when multiple sockets
-// are live at the same time.
+// Per request, tests use connectToServer + SendRequestToServer +
+// ReadResponseFromServer so all reads follow one completion policy.
 //
-// Stress tests that need concurrent or rapid-fire connections therefore use:
-//   rawRequest() — a self-contained POSIX socket function (socket / connect /
-//                  send / recv) with SO_RCVTIMEO for timeout.
-//   fork()       — each child process gets its own address space, its own
-//                  socket, and cannot interfere with the parent's multiplexer.
+// Concurrent tests still use fork(): each child has its own process state,
+// including its own copy of the multiplexer instance.
 //
 // Pass/fail accounting is kept consistent through evaluateStressResult(),
 // which builds a synthetic TestCase and calls actServerResponse() exactly
@@ -25,102 +102,48 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Tuning constants
 // ─────────────────────────────────────────────────────────────────────────────
-static const int    SEQUENTIAL_COUNT    = 50;    // requests in Test 1
+static const int    SEQUENTIAL_COUNT    = 1000;    // requests in Test 1
 static const int    CONCURRENT_CLIENTS  = 10;    // forked children in Test 2
 static const int    SLOW_BYTE_DELAY_US  = 5000;  // 5 ms between bytes in Test 3
 static const size_t LARGE_HEADER_SIZE   = 8192;  // bytes in custom header Test 4
-static const int    RAW_TIMEOUT_MS      = 3000;  // SO_RCVTIMEO for rawRequest()
+static const int    RAW_TIMEOUT_MS      = 3000;  // timeout used by ATestList flow
+static const int    KEEPALIVE_SWARM     = 10000; // sockets held in Test 6
 
 // ─────────────────────────────────────────────────────────────────────────────
-// rawRequest — static helper
+// requestWithATestList — helper
 //
-// Opens a blocking TCP socket to host:port, sends the full request string,
-// then reads until both conditions are true:
-//   • The header block ending "\r\n\r\n" has been received.
-//   • response.size() >= headerLength + contentLength
-//   (Mirrors the termination logic in ATestList::ReadResponseFromServer.)
-//
-// A SO_RCVTIMEO of timeoutMs milliseconds is set before connect() so that
-// a non-responsive server does not block the caller indefinitely.
-//
-// Safe to call from forked child processes and from std::thread contexts
-// because it allocates no shared state.
+// Runs one request through ATestList connect/send/read helpers and returns
+// the full response. Cleans up epoll registration and SocketIO on all paths.
 // ─────────────────────────────────────────────────────────────────────────────
-bool StressTests::rawRequest(const string &host, const string &port,
-                             const string &request, string &responseOut,
-                             int timeoutMs)
+bool StressTests::requestWithATestList(const string &host, const string &port,
+                                       const string &request, string &responseOut,
+                                       int timeoutMs)
 {
-	responseOut.clear();
+	TestCase cfg;
+	cfg.host = host;
+	cfg.port = port;
+	cfg.request = request;
+	cfg.timeout = timeoutMs;
+	cfg.socket = -1;
+	cfg.socketIO = NULL;
 
-	// ── Open socket ──────────────────────────────────────────────────────────
-	int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0)
+	if (!connectToServer(cfg))
 		return false;
 
-	// ── Set receive timeout ──────────────────────────────────────────────────
-	struct timeval tv;
-	tv.tv_sec  = timeoutMs / 1000;
-	tv.tv_usec = (timeoutMs % 1000) * 1000;
-	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-	// ── Connect ──────────────────────────────────────────────────────────────
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port   = htons((uint16_t)stoi(port));
-	const char *ip  = (host == "localhost") ? "127.0.0.1" : host.c_str();
-	if (inet_pton(AF_INET, ip, &addr.sin_addr) <= 0 ||
-	    ::connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+	if (!SendRequestToServer(cfg))
 	{
-		::close(fd);
+		cleanupStressSocket(multiplexer, cfg);
 		return false;
 	}
 
-	// ── Send full request ────────────────────────────────────────────────────
-	size_t sent = 0;
-	while (sent < request.size())
+	if (!ReadResponseFromServer(cfg))
 	{
-		int n = ::send(fd, request.c_str() + sent, request.size() - sent, 0);
-		if (n <= 0)
-		{
-			::close(fd);
-			return false;
-		}
-		sent += (size_t)n;
+		cleanupStressSocket(multiplexer, cfg);
+		return false;
 	}
 
-	// ── Read response — same Content-Length termination as ATestList ─────────
-	char buf[1024];
-	while (true)
-	{
-		int n = ::recv(fd, buf, sizeof(buf), 0);
-		if (n <= 0)
-			break;   // timeout or connection closed — use whatever we have
-		responseOut.append(buf, (size_t)n);
-
-		// Look for end-of-headers marker
-		size_t headerEnd = responseOut.find("\r\n\r\n");
-		if (headerEnd == string::npos)
-			continue;
-		size_t headerLength = headerEnd + 4;
-
-		// Extract Content-Length value
-		size_t clPos = responseOut.find("Content-Length:");
-		if (clPos == string::npos)
-			continue;
-		clPos += strlen("Content-Length:");
-		while (clPos < responseOut.size() && isspace((unsigned char)responseOut[clPos]))
-			clPos++;
-		size_t clEnd = responseOut.find("\r\n", clPos);
-		if (clEnd == string::npos)
-			continue;
-		size_t contentLength = (size_t)atoi(responseOut.substr(clPos, clEnd - clPos).c_str());
-
-		if (responseOut.size() >= headerLength + contentLength)
-			break;   // complete response received
-	}
-
-	::close(fd);
+	responseOut = cfg.response;
+	cleanupStressSocket(multiplexer, cfg);
 	return !responseOut.empty();
 }
 
@@ -139,7 +162,7 @@ void StressTests::evaluateStressResult(const string &testName,
 	TestCase result;
 	result.name             = testName;
 	result.description      = testDescription;
-	result.expectedResponse = expectedResponse;
+	result.expectedResponse.push_back(expectedResponse);
 	result.response         = syntheticResponse;
 	// Set headerLength so actServerResponse can call substr(0, headerLength)
 	// without reading past the synthetic string.
@@ -168,9 +191,9 @@ StressTests::~StressTests()
 // Targets: ServerManager (fd recycling), Multiplexer (epoll correctness after
 //          repeated close/open cycles), Socket (no fd leak)
 //
-// Sends SEQUENTIAL_COUNT (50) GET / requests back-to-back, each on its own
-// new TCP connection, using rawRequest() so the parent multiplexer is never
-// touched.  A fresh connection is opened and closed for every iteration.
+// Sends SEQUENTIAL_COUNT GET / requests back-to-back, each on its own
+// new TCP connection, using the same ATestList send/read flow used elsewhere.
+// A fresh connection is opened and closed for every iteration.
 //
 // Why this matters: a common fd leak occurs when a request fails mid-flight
 // and the close() path is skipped.  After enough connections the server runs
@@ -202,7 +225,7 @@ void StressTests::RapidSequentialRequestsTest()
 	for (int i = 0; i < SEQUENTIAL_COUNT; i++)
 	{
 		string response;
-		bool ok = rawRequest(host, port, request, response, RAW_TIMEOUT_MS);
+		bool ok = requestWithATestList(host, port, request, response, RAW_TIMEOUT_MS);
 
 		if (ok && response.find(expected) != string::npos)
 		{
@@ -221,7 +244,7 @@ void StressTests::RapidSequentialRequestsTest()
 	if (successCount == SEQUENTIAL_COUNT)
 	{
 		// All passed — produce a string that contains the expected substring
-		synthetic = expected + "\r\nContent-Length: 0\r\n\r\n";
+		synthetic = expected;
 	}
 	else
 	{
@@ -256,10 +279,10 @@ void StressTests::RapidSequentialRequestsTest()
 //          (accept loop), ServerTask (per-connection state isolation)
 //
 // Forks CONCURRENT_CLIENTS (10) child processes simultaneously.  Each child
-// independently calls rawRequest() for GET / and exits with 0 if it receives
-// "HTTP/1.1 200 OK", or with 1 otherwise.  Because fork() gives each child
+// independently runs one raw GET / request and exits with 0 if it
+// receives "HTTP/1.1 200 OK", or with 1 otherwise. Because fork() gives each child
 // its own address space and its own socket, there is zero shared state between
-// children — the parent's multiplexer is untouched.
+// children — avoiding inherited epoll state interactions.
 //
 // The parent waits for every child with waitpid() and counts how many exited 0.
 //
@@ -296,7 +319,7 @@ void StressTests::ConcurrentConnectionsTest()
 		{
 			// ── Child process ───────────────────────────────────────────────
 			string response;
-			bool ok = rawRequest(host, port, request, response, RAW_TIMEOUT_MS);
+			bool ok = childConcurrentRequest(host, port, request, response, RAW_TIMEOUT_MS);
 			if (ok && response.find(expected) != string::npos)
 				_exit(0);   // success
 			else
@@ -321,7 +344,7 @@ void StressTests::ConcurrentConnectionsTest()
 	string synthetic;
 	if (failedChildren == 0)
 	{
-		synthetic = expected + "\r\nContent-Length: 0\r\n\r\n";
+		synthetic = expected;
 	}
 	else
 	{
@@ -377,77 +400,45 @@ void StressTests::SlowClientTest()
 
 	string responseOut;
 	bool   gotResponse = false;
+	TestCase slowCase;
+	slowCase.host = host;
+	slowCase.port = port;
+	slowCase.timeout = 5000;
+	slowCase.socket = -1;
+	slowCase.socketIO = NULL;
 
-	// ── Open raw socket ───────────────────────────────────────────────────────
-	int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-	if (fd >= 0)
+	if (connectToServer(slowCase))
 	{
-		// 5-second receive timeout — slow send takes ~190 ms, plenty of margin
-		struct timeval tv;
-		tv.tv_sec  = 5;
-		tv.tv_usec = 0;
-		setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-		struct sockaddr_in addr;
-		memset(&addr, 0, sizeof(addr));
-		addr.sin_family = AF_INET;
-		addr.sin_port   = htons(1025);
-		inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
-
-		if (::connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+		// ── Send one byte at a time ───────────────────────────────────────
+		bool sendOk = true;
+		for (size_t i = 0; i < request.size() && sendOk; i++)
 		{
-			// ── Send one byte at a time ───────────────────────────────────────
-			bool sendOk = true;
-			for (size_t i = 0; i < request.size() && sendOk; i++)
-			{
-				int n = ::send(fd, request.c_str() + i, 1, 0);
-				if (n != 1)
-					sendOk = false;
-				else
-					usleep(SLOW_BYTE_DELAY_US);
-			}
-
-			if (sendOk)
-			{
-				// ── Read complete response ─────────────────────────────────────
-				char buf[1024];
-				while (true)
-				{
-					int n = ::recv(fd, buf, sizeof(buf), 0);
-					if (n <= 0)
-						break;
-					responseOut.append(buf, (size_t)n);
-
-					size_t headerEnd = responseOut.find("\r\n\r\n");
-					if (headerEnd == string::npos)
-						continue;
-					size_t headerLength = headerEnd + 4;
-
-					size_t clPos = responseOut.find("Content-Length:");
-					if (clPos == string::npos)
-						continue;
-					clPos += strlen("Content-Length:");
-					while (clPos < responseOut.size() && isspace((unsigned char)responseOut[clPos]))
-						clPos++;
-					size_t clEnd = responseOut.find("\r\n", clPos);
-					if (clEnd == string::npos)
-						continue;
-					size_t contentLength = (size_t)atoi(responseOut.substr(clPos, clEnd - clPos).c_str());
-
-					if (responseOut.size() >= headerLength + contentLength)
-					{
-						gotResponse = true;
-						break;
-					}
-				}
-			}
+			int n = slowCase.socketIO->Send((void *)(request.c_str() + i), 1);
+			if (n != 1)
+				sendOk = false;
+			else
+				usleep(SLOW_BYTE_DELAY_US);
 		}
-		::close(fd);
+
+		bool inAdded = false;
+		if (sendOk)
+		{
+			inAdded = multiplexer.AddAsEpollIn(slowCase.socketIO);
+			if (inAdded && ReadResponseFromServer(slowCase))
+			{
+				gotResponse = true;
+				responseOut = slowCase.response;
+			}
+			if (inAdded)
+				multiplexer.DeleteFromEpoll(slowCase.socketIO);
+		}
+
+		cleanupStressSocket(multiplexer, slowCase);
 	}
 
 	string synthetic;
 	if (gotResponse && responseOut.find(expected) != string::npos)
-		synthetic = expected + "\r\nContent-Length: 0\r\n\r\n";
+		synthetic = expected;
 	else if (!gotResponse)
 		synthetic = "FAILED: no complete response received. "
 		            "Server likely closed the connection before the slow "
@@ -509,14 +500,13 @@ void StressTests::LargeRequestHeadersTest()
 	     << CLR_DIM << " (" << LARGE_HEADER_SIZE << " byte value)" << RESET << endl;
 
 	string response;
-	bool   ok = rawRequest(host, port, request, response, RAW_TIMEOUT_MS);
+	bool   ok = requestWithATestList(host, port, request, response, RAW_TIMEOUT_MS);
 
 	string synthetic;
 	if (ok && response.find(expected) != string::npos)
 	{
 		// Pass — extract first line for the diagnosis printout
-		synthetic = response.substr(0, response.find("\r\n") + 2) +
-		            "Content-Length: 0\r\n\r\n";
+		synthetic = response.substr(0, response.find("\r\n") + 2);
 	}
 	else if (!ok || response.empty())
 	{
@@ -585,7 +575,7 @@ void StressTests::ConnectionAfterErrorTest()
 		"Host: localhost\r\n"
 		"\r\n";
 	string errorResponse;
-	rawRequest(host, port, errorRequest, errorResponse, RAW_TIMEOUT_MS);
+	requestWithATestList(host, port, errorRequest, errorResponse, RAW_TIMEOUT_MS);
 
 	size_t errLine = errorResponse.find("\r\n");
 	string errStatus = (errLine != string::npos)
@@ -599,12 +589,12 @@ void StressTests::ConnectionAfterErrorTest()
 		"Host: localhost\r\n"
 		"\r\n";
 	string okResponse;
-	bool   ok = rawRequest(host, port, okRequest, okResponse, RAW_TIMEOUT_MS);
+	bool   ok = requestWithATestList(host, port, okRequest, okResponse, RAW_TIMEOUT_MS);
 
 	string synthetic;
 	if (ok && okResponse.find(expected) != string::npos)
 	{
-		synthetic = expected + "\r\nContent-Length: 0\r\n\r\n";
+		synthetic = expected;
 	}
 	else if (!ok || okResponse.empty())
 	{
@@ -636,6 +626,199 @@ void StressTests::ConnectionAfterErrorTest()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Test 6 — Keep-alive connection eviction under extreme socket pressure
+// Targets: ServerManager / connection pool policy under very high load.
+//
+// Opens as many keep-alive client sockets as possible (target: 10,000), sends
+// one keep-alive request on each, and keeps sockets open. After reaching the
+// target (or local process limit), it attempts one additional connection to
+// pressure the server's connection limit. Finally, it probes the oldest socket
+// to check whether the server closed it.
+//
+// Note: If the local machine cannot open 10,000 sockets due to ulimit, the test
+// reports that as an environment limitation rather than a server failure.
+// ─────────────────────────────────────────────────────────────────────────────
+void StressTests::KeepAliveConnectionEvictionTest()
+{
+	const string expectedClosedSignal = "OLDEST_CONNECTION_CLOSED";
+	const string keepAliveRequest =
+		"GET / HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Connection: keep-alive\r\n"
+		"\r\n";
+
+	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Keep-Alive Eviction" << RESET
+	     << CLR_DIM << " (up to " << KEEPALIVE_SWARM << " persistent sockets)" << RESET << endl;
+
+	vector<TestCase *> sockets;
+	sockets.reserve(KEEPALIVE_SWARM);
+
+	int opened = 0;
+	int openFailures = 0;
+	string openFailureReason;
+
+	for (int i = 0; i < KEEPALIVE_SWARM; i++)
+	{
+		TestCase *conn = new TestCase();
+		conn->host = "127.0.0.1";
+		conn->port = "1025";
+		conn->request = keepAliveRequest;
+		conn->timeout = 2000;
+		conn->socket = -1;
+		conn->socketIO = NULL;
+
+		if (!connectToServer(*conn))
+		{
+			openFailures++;
+			if (openFailureReason.empty())
+				openFailureReason = "connect() failed";
+			delete conn;
+			break;
+		}
+
+		if (!SendRequestToServer(*conn))
+		{
+			openFailures++;
+			if (openFailureReason.empty())
+				openFailureReason = "send() failed";
+			cleanupStressSocket(multiplexer, *conn);
+			delete conn;
+			break;
+		}
+
+		if (!ReadResponseFromServer(*conn))
+		{
+			openFailures++;
+			if (openFailureReason.empty())
+				openFailureReason = "read() failed while opening keep-alive socket";
+			cleanupStressSocket(multiplexer, *conn);
+			delete conn;
+			break;
+		}
+
+		if (conn->response.find("HTTP/1.1 200 OK") == string::npos)
+		{
+			openFailures++;
+			if (openFailureReason.empty())
+				openFailureReason = "keep-alive setup returned non-200 response";
+			cleanupStressSocket(multiplexer, *conn);
+			delete conn;
+			break;
+		}
+
+		multiplexer.DeleteFromEpoll(conn->socketIO);
+		sockets.push_back(conn);
+		opened++;
+	}
+	
+	bool extraConnected = false;
+	TestCase extraConn;
+	extraConn.socket = -1;
+	extraConn.socketIO = NULL;
+
+	if (!sockets.empty())
+	{
+		extraConn.host = "127.0.0.1";
+		extraConn.port = "1025";
+		if (connectToServer(extraConn))
+		{
+			extraConnected = true;
+		}
+	}
+
+	bool keepAliveSanityOk = false;
+	size_t keepAliveSanityIndex = 0;
+	if (!sockets.empty())
+	{
+		// Probe a near-tail socket to verify keep-alive still works on a non-oldest connection.
+		keepAliveSanityIndex = (sockets.size() > 20) ? (sockets.size() - 20) : (sockets.size() - 1);
+		TestCase *probe = sockets[keepAliveSanityIndex];
+		probe->request = keepAliveRequest;
+		probe->sendedBytes = 0;
+		probe->response.clear();
+		probe->contentLength = (size_t)-1;
+		probe->headerLength = (size_t)-1;
+		if (SendRequestToServer(*probe)
+			&& ReadResponseFromServer(*probe)
+			&& probe->response.find("HTTP/1.1 200 OK") != string::npos)
+		{
+			keepAliveSanityOk = true;
+		}
+		multiplexer.DeleteFromEpoll(probe->socketIO);
+	}
+
+	bool oldestClosed = false;
+	if (!sockets.empty())
+	{
+		TestCase *oldest = sockets.front();
+		oldest->request = keepAliveRequest;
+		oldest->sendedBytes = 0;
+		oldest->response.clear();
+		oldest->contentLength = (size_t)-1;
+		oldest->headerLength = (size_t)-1;
+		if (!SendRequestToServer(*oldest))
+		{
+			oldestClosed = true;
+		}
+		else
+		{
+			if (!ReadResponseFromServer(*oldest) || oldest->response.empty())
+				oldestClosed = true;
+		}
+		multiplexer.DeleteFromEpoll(oldest->socketIO);
+	}
+
+	if (extraConn.socketIO)
+		cleanupStressSocket(multiplexer, extraConn);
+	for (size_t i = 0; i < sockets.size(); i++)
+	{
+		cleanupStressSocket(multiplexer, *sockets[i]);
+		delete sockets[i];
+	}
+
+	string synthetic;
+	if (opened < KEEPALIVE_SWARM)
+	{
+		synthetic = "FAILED: opened " + to_string(opened) + "/" + to_string(KEEPALIVE_SWARM) +
+		            " sockets before failure (" + openFailureReason + "). "
+		            "Likely local ulimit or environment ceiling.";
+	}
+	else if (!keepAliveSanityOk)
+	{
+		synthetic = "FAILED: keep-alive sanity probe failed on socket index " +
+		            to_string(keepAliveSanityIndex) + ". "
+		            "Could not confirm that non-oldest keep-alive connections still work.";
+	}
+	else if (oldestClosed)
+	{
+		synthetic = expectedClosedSignal;
+	}
+	else
+	{
+		synthetic = "FAILED: oldest keep-alive socket remained usable after 10,000 sockets. "
+		            "Server did not evict oldest connection under pressure. "
+		            "Extra connection " + string(extraConnected ? "succeeded" : "failed") + ".";
+	}
+
+	evaluateStressResult(
+		"Keep-Alive Connection Eviction Test",
+		"Test to open 10,000 keep-alive sockets and verify whether the server "
+		"starts closing the oldest persistent connection when capacity is under "
+		"extreme pressure.",
+		expectedClosedSignal,
+		synthetic
+	);
+
+	CLI::printInfo("Opened sockets: " + to_string(opened) + "/" + to_string(KEEPALIVE_SWARM));
+	if (opened < KEEPALIVE_SWARM)
+		CLI::printHint("Could not reach 10,000 sockets. Check process/server ulimit (nofile). " + openFailureReason);
+	else if (!keepAliveSanityOk)
+		CLI::printHint("Keep-alive sanity probe on socket index " + to_string(keepAliveSanityIndex) + " failed. Verify persistent-connection handling before eviction assertions.");
+	else if (!oldestClosed)
+		CLI::printHint("Oldest keep-alive connection stayed open. If eviction is expected, inspect your LRU/idle connection cleanup policy.");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 void StressTests::AddAllTests()
 {
 	_testFunctions.push_back( make_pair("Rapid Sequential Requests Test", (void (ATestList::*)())&StressTests::RapidSequentialRequestsTest) );
@@ -643,4 +826,5 @@ void StressTests::AddAllTests()
 	_testFunctions.push_back( make_pair("Slow Client Test",               (void (ATestList::*)())&StressTests::SlowClientTest) );
 	_testFunctions.push_back( make_pair("Large Request Headers Test",     (void (ATestList::*)())&StressTests::LargeRequestHeadersTest) );
 	_testFunctions.push_back( make_pair("Connection After Error Test",    (void (ATestList::*)())&StressTests::ConnectionAfterErrorTest) );
+	_testFunctions.push_back( make_pair("Keep-Alive Connection Eviction Test", (void (ATestList::*)())&StressTests::KeepAliveConnectionEvictionTest) );
 }

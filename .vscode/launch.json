@@ -5,7 +5,7 @@
       "name": "(gdb) Launch",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/webTester.out",
+      "program": "${workspaceFolder}/servTester.out",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

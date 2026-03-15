@@ -63,9 +63,9 @@ void RedirectionTests::PermanentRedirectStatusTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 301 Moved Permanently";
+	testCase.expectedResponse.push_back("HTTP/1.1 301 Moved Permanently");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Add 'location /old-page { return 301 /new-page; }' in your config. "
 		"CRITICAL: The 301 response MUST include 'Content-Length' (even if the "
 		"value is 0) otherwise the test reader will block forever waiting for the "
@@ -102,9 +102,9 @@ void RedirectionTests::PermanentRedirectLocationHeaderTest()
 		"\r\n";
 
 	// Substring match — will find "Location: /new-page" anywhere in the response
-	testCase.expectedResponse = "Location: /new-page";
+	testCase.expectedResponse.push_back("Location: /new-page");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same 'location /old-page { return 301 /new-page; }'. "
 		"The Location header value must exactly match the URL given in the "
 		"'return' directive. Check for off-by-one errors: 'Location:/new-page' "
@@ -141,9 +141,9 @@ void RedirectionTests::TemporaryRedirectStatusTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 302 Found";
+	testCase.expectedResponse.push_back("HTTP/1.1 302 Found");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Add 'location /temp-page { return 302 /index.htm; }' in your config. "
 		"CRITICAL: Response must include 'Content-Length' (even if 0). "
 		"If both 301 and 302 routes return 301 your redirect code generator "
@@ -178,9 +178,9 @@ void RedirectionTests::TemporaryRedirectLocationHeaderTest()
 		"\r\n";
 
 	// Substring match — finds "Location: /index.htm" anywhere in the response
-	testCase.expectedResponse = "Location: /index.htm";
+	testCase.expectedResponse.push_back("Location: /index.htm");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same 'location /temp-page { return 302 /index.htm; }'. "
 		"Verify the Location value is '/index.htm' and NOT '/new-page' — that "
 		"would indicate the response builder is reusing the 301 route's value. "
@@ -219,9 +219,9 @@ void RedirectionTests::RedirectToExternalUrlTest()
 		"\r\n";
 
 	// Matches any absolute URL scheme — "Location: http" covers both http and https
-	testCase.expectedResponse = "Location: http";
+	testCase.expectedResponse.push_back("Location: http");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Add 'location /ext-redirect { return 301 http://example.com; }'. "
 		"The Location header in the response must contain the full absolute URL "
 		"'http://example.com' — not '/example.com' or 'example.com'. "

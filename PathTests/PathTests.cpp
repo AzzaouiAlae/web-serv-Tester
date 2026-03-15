@@ -21,8 +21,8 @@ void PathTests::NotFoundFileTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /nonexistent_file.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 404 Not Found";
-	testCase.configFileData   = "NOTE: Ensure no file named 'nonexistent_file.html' exists under your web root.";
+	testCase.expectedResponse.push_back("HTTP/1.1 404 Not Found");
+	testCase.configurationsForTestCase   = "NOTE: Ensure no file named 'nonexistent_file.html' exists under your web root.";
 	testCase.timeout          = 2000;
 
 	RunTestCase(testCase);
@@ -36,8 +36,8 @@ void PathTests::NotFoundDirectoryTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /ghost/missing/dir/ HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 404 Not Found";
-	testCase.configFileData   = "NOTE: Ensure the path '/ghost/missing/dir/' does not exist under your web root.";
+	testCase.expectedResponse.push_back("HTTP/1.1 404 Not Found");
+	testCase.configurationsForTestCase   = "NOTE: Ensure the path '/ghost/missing/dir/' does not exist under your web root.";
 	testCase.timeout          = 2000;
 
 	RunTestCase(testCase);
@@ -55,8 +55,8 @@ void PathTests::ForbiddenFileTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /forbidden.txt HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 403 Forbidden";
-	testCase.configFileData   = "SETUP: touch <webroot>/forbidden.txt && chmod 000 <webroot>/forbidden.txt\n"
+	testCase.expectedResponse.push_back("HTTP/1.1 403 Forbidden");
+	testCase.configurationsForTestCase   = "SETUP: touch <webroot>/forbidden.txt && chmod 000 <webroot>/forbidden.txt\n"
 	                            "Server must NOT run as root (root bypasses permission checks).";
 	testCase.timeout          = 2000;
 
@@ -71,8 +71,8 @@ void PathTests::ForbiddenDirectoryTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /forbidden_dir/ HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 403 Forbidden";
-	testCase.configFileData   = "SETUP: mkdir <webroot>/forbidden_dir && chmod 000 <webroot>/forbidden_dir\n"
+	testCase.expectedResponse.push_back("HTTP/1.1 403 Forbidden");
+	testCase.configurationsForTestCase   = "SETUP: mkdir <webroot>/forbidden_dir && chmod 000 <webroot>/forbidden_dir\n"
 	                            "Server must NOT run as root.";
 	testCase.timeout          = 2000;
 
@@ -87,8 +87,8 @@ void PathTests::DirectoryWithoutIndexTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /empty_dir/ HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 403 Forbidden";
-	testCase.configFileData   = "SETUP: mkdir <webroot>/empty_dir\n"
+	testCase.expectedResponse.push_back("HTTP/1.1 403 Forbidden");
+	testCase.configurationsForTestCase   = "SETUP: mkdir <webroot>/empty_dir\n"
 	                            "Disable autoindex for this path. Do NOT place any index file inside.";
 	testCase.timeout          = 2000;
 
@@ -107,8 +107,8 @@ void PathTests::PathTraversalTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /../../../etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 404 Not Found";
-	testCase.configFileData   = "WARNING: A 200 OK here is a critical security vulnerability. "
+	testCase.expectedResponse.push_back("HTTP/1.1 404 Not Found");
+	testCase.configurationsForTestCase   = "WARNING: A 200 OK here is a critical security vulnerability. "
 	                            "Acceptable: 404 Not Found or 400 Bad Request or 403 Forbidden.";
 	testCase.timeout          = 2000;
 
@@ -124,8 +124,8 @@ void PathTests::EncodedTraversalTest()
 	testCase.host             = "localhost";
 	// %2e = '.'  %2f = '/'  ->  decodes to ../../etc/passwd
 	testCase.request          = "GET /%2e%2e/%2e%2e/etc/passwd HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 404 Not Found";
-	testCase.configFileData   = "NOTE: Decode percent-encoding BEFORE resolving the path. "
+	testCase.expectedResponse.push_back("HTTP/1.1 404 Not Found");
+	testCase.configurationsForTestCase   = "NOTE: Decode percent-encoding BEFORE resolving the path. "
 	                            "Then apply the same traversal check as for raw '../'.";
 	testCase.timeout          = 2000;
 
@@ -140,8 +140,8 @@ void PathTests::NullByteInPathTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /index%00.htm HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 400 Bad Request";
-	testCase.configFileData   = "NOTE: A null byte in the URI is always invalid per RFC 3986. "
+	testCase.expectedResponse.push_back("HTTP/1.1 400 Bad Request");
+	testCase.configurationsForTestCase   = "NOTE: A null byte in the URI is always invalid per RFC 3986. "
 	                            "Passing %00 to open()/stat() is a security vulnerability.";
 	testCase.timeout          = 2000;
 
@@ -156,8 +156,8 @@ void PathTests::DoubleSlashPathTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET //index.htm HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
-	testCase.configFileData   = "NOTE: RFC 3986 allows collapsing '//' to '/'. "
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	testCase.configurationsForTestCase   = "NOTE: RFC 3986 allows collapsing '//' to '/'. "
 	                            "A 301 redirect to the normalised path is also acceptable.";
 	testCase.timeout          = 2000;
 
@@ -176,8 +176,8 @@ void PathTests::VeryLongPathTest()
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
 	testCase.request          = "GET /" + string(9000, 'a') + " HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 414";
-	testCase.configFileData   = "NOTE: Adjust the path length to be just above your server's configured URI limit.";
+	testCase.expectedResponse.push_back("HTTP/1.1 414");
+	testCase.configurationsForTestCase   = "NOTE: Adjust the path length to be just above your server's configured URI limit.";
 	testCase.timeout          = 2000;
 
 	RunTestCase(testCase);

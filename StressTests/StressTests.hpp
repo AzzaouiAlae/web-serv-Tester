@@ -13,16 +13,14 @@ class StressTests : public ATestList
 	void SlowClientTest();
 	void LargeRequestHeadersTest();
 	void ConnectionAfterErrorTest();
+	void KeepAliveConnectionEvictionTest();
 	void AddAllTests();
 
-	// Opens a raw POSIX socket, sends request, reads until Content-Length+headers
-	// are fully received.  Uses SO_RCVTIMEO (timeoutMs) instead of epoll —
-	// safe to call from forked children and from any thread because it shares
-	// no state with the ATestList multiplexer instance.
-	// Returns true if a complete response was received; false on any error.
-	static bool rawRequest(const string &host, const string &port,
-	                       const string &request, string &responseOut,
-	                       int timeoutMs);
+	// Uses ATestList connection/send/read flow for a complete HTTP exchange.
+	// This guarantees response reading follows ReadResponseFromServer logic.
+	bool requestWithATestList(const string &host, const string &port,
+	                         const string &request, string &responseOut,
+	                         int timeoutMs);
 
 	// Synthesises pass/fail accounting for tests that bypass RunTestCase.
 	// Builds a fake TestCase whose response field is set to syntheticResponse,

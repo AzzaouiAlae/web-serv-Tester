@@ -59,9 +59,9 @@ void MethodRestrictionTests::PostToGetOnlyRouteTest()
 		"\r\n"
 		+ body;
 
-	testCase.expectedResponse = "HTTP/1.1 405 Method Not Allowed";
+	testCase.expectedResponse.push_back("HTTP/1.1 405 Method Not Allowed");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Add a location block for '/get-only' with 'allowed_methods GET'. "
 		"The server must reject POST before touching the request body. "
 		"The 405 response MUST include a body and 'Content-Length' header — "
@@ -96,9 +96,9 @@ void MethodRestrictionTests::DeleteToGetOnlyRouteTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 405 Method Not Allowed";
+	testCase.expectedResponse.push_back("HTTP/1.1 405 Method Not Allowed");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/get-only' location with 'allowed_methods GET'. "
 		"No body in a DELETE is correct. "
 		"The 405 response MUST include 'Content-Length' for the test reader to exit.";
@@ -131,9 +131,9 @@ void MethodRestrictionTests::GetToPostOnlyRouteTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 405 Method Not Allowed";
+	testCase.expectedResponse.push_back("HTTP/1.1 405 Method Not Allowed");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Add a location block for '/post-only' with 'allowed_methods POST'. "
 		"This test proves the allowed_methods check is per-route, not a global "
 		"'always allow GET' shortcut. The 405 response must include 'Content-Length'.";
@@ -166,9 +166,9 @@ void MethodRestrictionTests::DeleteToPostOnlyRouteTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 405 Method Not Allowed";
+	testCase.expectedResponse.push_back("HTTP/1.1 405 Method Not Allowed");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/post-only' location with 'allowed_methods POST'. "
 		"The 405 response must include 'Content-Length'.";
 
@@ -214,9 +214,9 @@ void MethodRestrictionTests::AllowHeaderPresentOn405Test()
 		+ body;
 
 	// Substring match — passes if the header name exists anywhere in the response
-	testCase.expectedResponse = "Allow:";
+	testCase.expectedResponse.push_back("Allow:");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/get-only' location. When building the 405 response your "
 		"Repsense/response builder must inject an 'Allow:' header whose value "
 		"is the comma-separated list of methods from the route config "

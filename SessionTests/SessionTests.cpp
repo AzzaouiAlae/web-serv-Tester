@@ -10,7 +10,7 @@
 //
 // Common choices: "SESSION_ID", "session_id", "SESSID", "sid"
 // ─────────────────────────────────────────────────────────────────────────────
-static const string SESSION_COOKIE_NAME = "SESSION_ID";
+string SESSION_COOKIE_NAME = "SESSION_ID";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE AND CGI SETUP
@@ -173,9 +173,9 @@ void SessionTests::SetCookieOnFirstVisitTest()
 		"\r\n";
 
 	// Generic assertion — any Set-Cookie header passes this test
-	testCase.expectedResponse = "Set-Cookie:";
+	testCase.expectedResponse.push_back("Set-Cookie:");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: No special files needed — uses the existing '/' route. "
 		"The server's SessionManagement must generate a new session on every "
 		"request that does not carry a recognised Cookie header. "
@@ -224,9 +224,16 @@ void SessionTests::CookieValueNotEmptyTest()
 		"\r\n";
 
 	// Requires both the correct name AND the '=' sign that precedes the value
-	testCase.expectedResponse = "Set-Cookie: " + SESSION_COOKIE_NAME + "=";
+	SESSION_COOKIE_NAME = "SESSIONID";
+	testCase.expectedResponse.push_back(
+		"Set-Cookie: " + SESSION_COOKIE_NAME + "=||" 
+		"Set-Cookie: SESSIONID=||"
+		"Set-Cookie: session_id=||"
+		"Set-Cookie: sid=||"
+		"Set-Cookie: sessid=||"
+		"Set-Cookie: SESSID=");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same as Test 1. "
 		"If this fails but Test 1 passed, the server is using a different cookie "
 		"name than SESSION_COOKIE_NAME ('" + SESSION_COOKIE_NAME + "'). "
@@ -277,26 +284,32 @@ void SessionTests::HttpCookieEnvVarTest()
 		"GET / HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"\r\n";
-	setupCase.expectedResponse = "";   // not asserted — this step is setup only
+	setupCase.expectedResponse.push_back("");   // not asserted — this step is setup only
 	setupCase.timeout          = 2000;
 
 	printTestCard(setupCase);
-	if (!connectToServer(setupCase))
+	if (!connectToServer(setupCase)) {
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		return;
-	if (!SendRequestToServer(setupCase))
+	}
+	if (!SendRequestToServer(setupCase)) {
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		return;
-	if (!ReadResponseFromServer(setupCase))
+	}
+	if (!ReadResponseFromServer(setupCase)) {
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);	
 		return;
-
+	}
 	// Extract the session ID from the Set-Cookie header
 	string sessionId = extractCookieValue(setupCase.response, SESSION_COOKIE_NAME);
 	if (sessionId.empty())
 	{
 		CLI::printError("HTTP Cookie Env Var Test failed: could not extract session ID from step 1 response.");
 		CLI::printHint("Is Set-Cookie being issued?");
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		return;
 	}
-
+	multiplexer.DeleteFromEpoll(setupCase.socketIO);
 	// ── Step 2: send cookie back, assert CGI echoes it ───────────────────────
 	TestCase testCase;
 	testCase.name        = "HTTP Cookie Env Var Test";
@@ -315,9 +328,9 @@ void SessionTests::HttpCookieEnvVarTest()
 		"\r\n";
 
 	// The CGI prints HTTP_COOKIE which contains the session ID
-	testCase.expectedResponse = sessionId;
+	testCase.expectedResponse.push_back(sessionId);
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Requires cookie_check.py in /cgi-bin — see the script at the "
 		"top of SessionTests.cpp. "
 		"The script reads HTTP_COOKIE and echoes it as the response body. "
@@ -370,9 +383,9 @@ void SessionTests::InvalidSessionNewCookieTest()
 		"\r\n";
 
 	// Any Set-Cookie header proves the server created a new session
-	testCase.expectedResponse = "Set-Cookie:";
+	testCase.expectedResponse.push_back("Set-Cookie:");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: No special files needed. "
 		"The server must look up 'not-a-real-session-xyz-000' in its session "
 		"store, find nothing, and create a brand-new session. "
@@ -435,23 +448,32 @@ void SessionTests::SessionDataStoredTest()
 		"GET / HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"\r\n";
-	setupCase.expectedResponse = "";
+	setupCase.expectedResponse.push_back("");
 	setupCase.timeout          = 2000;
 
 	printTestCard(setupCase);
-	if (!connectToServer(setupCase))
+	if (!connectToServer(setupCase)) {
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		return;
-	if (!SendRequestToServer(setupCase))
+	}
+	if (!SendRequestToServer(setupCase)) {
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		return;
-	if (!ReadResponseFromServer(setupCase))
+	}
+	if (!ReadResponseFromServer(setupCase)) {
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		return;
+	}
 
 	string sessionId = extractCookieValue(setupCase.response, SESSION_COOKIE_NAME);
 	if (sessionId.empty())
 	{
+		multiplexer.DeleteFromEpoll(setupCase.socketIO);
 		CLI::printError("Session Data Stored Test failed: could not extract session ID from step 1 response.");
 		return;
 	}
+	multiplexer.DeleteFromEpoll(setupCase.socketIO);
+
 
 	// ── Step 2: write data to the session via CGI ─────────────────────────────
 	TestCase writeCase;
@@ -472,25 +494,34 @@ void SessionTests::SessionDataStoredTest()
 		"\r\n"
 		+ storedValue;
 
-	writeCase.expectedResponse = "";   // not asserted here
+	writeCase.expectedResponse.push_back("");   // not asserted here
 	writeCase.timeout          = 5000;
 
 	// Manual sequencing — we only care about completion, not pass/fail
-	if (!connectToServer(writeCase))
+	if (!connectToServer(writeCase)) {
+		multiplexer.DeleteFromEpoll(writeCase.socketIO);
 		return;
-	if (!SendRequestToServer(writeCase))
+	}
+	if (!SendRequestToServer(writeCase)) {
+		multiplexer.DeleteFromEpoll(writeCase.socketIO);
 		return;
-	if (!ReadResponseFromServer(writeCase))
+	}
+	if (!ReadResponseFromServer(writeCase)) {
+		multiplexer.DeleteFromEpoll(writeCase.socketIO);
 		return;
+	}
 
 	// Sanity check: if session_write.py returned "NO-SESSION", HTTP_COOKIE
 	// was not set — there is no point running step 3.
 	if (writeCase.response.find("WRITE-OK") == string::npos)
 	{
+		multiplexer.DeleteFromEpoll(writeCase.socketIO);
 		CLI::printError("Session Data Stored Test failed at step 2: session_write.py did not return WRITE-OK.");
 		CLI::printHint("HTTP_COOKIE may not be set in the CGI environment.");
 		return;
 	}
+	multiplexer.DeleteFromEpoll(writeCase.socketIO);
+
 
 	// ── Step 3: read data back and assert ────────────────────────────────────
 	TestCase readCase;
@@ -509,9 +540,9 @@ void SessionTests::SessionDataStoredTest()
 		"\r\n";
 
 	// The sentinel we wrote in step 2 must appear in the body
-	readCase.expectedResponse = storedValue;
+	readCase.expectedResponse.push_back(storedValue);
 
-	readCase.configFileData =
+	readCase.configurationsForTestCase =
 		"SETUP: Requires session_write.py and session_read.py in /cgi-bin. "
 		"See the scripts at the top of SessionTests.cpp. "
 		"Both scripts use /tmp/sess_<session_id>.txt as shared storage — "

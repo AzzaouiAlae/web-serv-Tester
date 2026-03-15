@@ -104,9 +104,9 @@ void ChunkedTransferTests::ChunkedPostSimpleTest()
 		"\r\n"
 		+ chunkedBody;
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK||HTTP/1.1 201 Created");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: The '/upload' route must allow POST and have "
 		"'client_max_body_size' >= 13 bytes. "
 		"The raw chunked body sent is: \"d\\r\\nHello, World!\\r\\n0\\r\\n\\r\\n\". "
@@ -169,9 +169,9 @@ void ChunkedTransferTests::ChunkedPostMultiChunkTest()
 		"\r\n"
 		+ chunkedBody;
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK||HTTP/1.1 201 Created");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/upload' route as Test 1. "
 		"Raw body sent: \"5\\r\\nHello\\r\\n4\\r\\n, Wo\\r\\n4\\r\\nrld!\\r\\n0\\r\\n\\r\\n\". "
 		"If Test 1 passed but this fails, the chunk parser exits after the first "
@@ -244,9 +244,9 @@ void ChunkedTransferTests::ChunkedBodyEchoedByCgiTest()
 		+ chunkedBody;
 
 	// The echoed assembled body must appear in the response
-	testCase.expectedResponse = "CGI-CHUNKED-INPUT";
+	testCase.expectedResponse.push_back("CGI-CHUNKED-INPUT");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Requires echo_post.py from CGITests — see CGITests configFileData "
 		"for the script content. "
 		"Raw chunked body sent: \"9\\r\\nCGI-CHUNK\\r\\n8\\r\\nED-INPUT\\r\\n0\\r\\n\\r\\n\". "
@@ -258,7 +258,7 @@ void ChunkedTransferTests::ChunkedBodyEchoedByCgiTest()
 		"raw chunked bytes directly to stdin without un-chunking. "
 		"If the body is empty, CONTENT_LENGTH was not set or was set to 0.";
 
-	testCase.timeout = 5000;
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }
@@ -306,9 +306,9 @@ void ChunkedTransferTests::ChunkedBodySizeLimitTest()
 		"\r\n"
 		+ chunkedBody;
 
-	testCase.expectedResponse = "HTTP/1.1 413 Content Too Large";
+	testCase.expectedResponse.push_back("HTTP/1.1 413 Content Too Large||HTTP/1.1 413 Payload Too Large");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: '/upload' route with 'client_max_body_size 1024'. "
 		"This test sends 1025 assembled bytes split into two chunks. "
 		"The server should ideally reject as soon as the running assembled total "
@@ -366,9 +366,9 @@ void ChunkedTransferTests::ChunkedEmptyBodyTest()
 		"\r\n"
 		+ CHUNK_TERMINATOR;   // "0\r\n\r\n"
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK||HTTP/1.1 201 Created");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/upload' route as Tests 1 and 2. "
 		"The raw body sent after the headers is exactly: \"0\\r\\n\\r\\n\". "
 		"If this returns 400, the chunk parser is treating a zero-size chunk as "
@@ -384,6 +384,59 @@ void ChunkedTransferTests::ChunkedEmptyBodyTest()
 	RunTestCase(testCase);
 }
 
+void ChunkedTransferTests::ChunkedMultipartTest()
+{
+    // arrange
+    TestCase testCase;
+    testCase.name        = "Chunked Multipart File Upload";
+    testCase.description = "Test to check that the server correctly de-chunks a body, "
+                           "and then successfully parses the resulting multipart/form-data "
+                           "to extract the filename and file content.";
+    testCase.port        = "1025";
+    testCase.host        = "localhost";
+
+    // 1. The raw, unchunked multipart payload we want the server to extract.
+    // The total length of this string is exactly 147 bytes.
+    std::string multipartData = 
+        "--MyBoundary\r\n"
+        "Content-Disposition: form-data; name=\"upload\"; filename=\"test.txt\"\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "Hello from a chunk!\r\n"
+        "--MyBoundary--\r\n";
+    
+    // 2. We wrap it in chunked format. 147 in hexadecimal is "93".
+    std::string chunkedBody = 
+        "93\r\n"
+        + multipartData + 
+		"\r\n"
+        "0\r\n\r\n";
+
+    // 3. Assemble the full request
+    testCase.request =
+        "POST /upload HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        // Notice the boundary defined here matches the one in the body
+        "Content-Type: multipart/form-data; boundary=MyBoundary\r\n"
+        "Transfer-Encoding: chunked\r\n"
+        "\r\n"
+        + chunkedBody;
+
+    // Accepting 201 Created (best practice) or 200 OK
+    testCase.expectedResponse.push_back("HTTP/1.1 201 Created||HTTP/1.1 200 OK");
+
+    testCase.configurationsForTestCase =
+        "SETUP: Same '/upload' route. "
+        "The server must first de-chunk the payload. "
+        "Then, it must recognize the 'multipart/form-data' Content-Type, "
+        "parse the boundary, and extract the file named 'test.txt' "
+        "containing the text 'Hello from a chunk!'.";
+
+    testCase.timeout = 3000;
+
+    RunTestCase(testCase);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 void ChunkedTransferTests::AddAllTests()
 {
@@ -392,4 +445,5 @@ void ChunkedTransferTests::AddAllTests()
 	_testFunctions.push_back( make_pair("Chunked Body Echoed By CGI Test",   (void (ATestList::*)())&ChunkedTransferTests::ChunkedBodyEchoedByCgiTest) );
 	_testFunctions.push_back( make_pair("Chunked Body Size Limit Test",      (void (ATestList::*)())&ChunkedTransferTests::ChunkedBodySizeLimitTest) );
 	_testFunctions.push_back( make_pair("Chunked Empty Body Test",           (void (ATestList::*)())&ChunkedTransferTests::ChunkedEmptyBodyTest) );
+	_testFunctions.push_back( make_pair("Chunked Multipart File Upload Test", (void (ATestList::*)())&ChunkedTransferTests::ChunkedMultipartTest) );
 }

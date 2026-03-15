@@ -102,6 +102,8 @@ namespace CLI
 			unsigned char c = (unsigned char)s[i];
 			if (c == '\033') { inEsc = true; continue; }
 			if (inEsc) { if (c == 'm') inEsc = false; continue; }
+			if (c == '\r') continue;
+			if (c == '\t') { len += 4; continue; }
 			if (c < 0x80 || c >= 0xC0) len++;
 		}
 		return len;
@@ -132,7 +134,7 @@ namespace CLI
 	}
 	inline std::string dblRow(const std::string &content)
 	{
-		int avail = W - 1;
+		int avail = W - 3;
 		int vl = (int)visibleLen(content);
 		std::string pad;
 		if (vl < avail)
@@ -218,14 +220,35 @@ namespace CLI
 		std::string line;
 		int lineLen = 0;
 
+		// Flush current buffered line as one table row.
+		auto flushLine = [&]() {
+			if (!line.empty())
+			{
+				out << row(color + line + RESET) << std::endl;
+				line.clear();
+				lineLen = 0;
+			}
+		};
+
 		while (iss >> word)
 		{
 			int wlen = (int)word.size();
 			if (lineLen > 0 && lineLen + 1 + wlen > avail)
 			{
-				out << row(color + line + RESET) << std::endl;
-				line = word;
-				lineLen = wlen;
+				flushLine();
+			}
+
+			// If a single token is wider than the box, split it across rows.
+			if (wlen > avail)
+			{
+				flushLine();
+				size_t start = 0;
+				while (start < word.size())
+				{
+					size_t chunkLen = std::min((size_t)avail, word.size() - start);
+					out << row(color + word.substr(start, chunkLen) + RESET) << std::endl;
+					start += chunkLen;
+				}
 			}
 			else
 			{
@@ -234,8 +257,7 @@ namespace CLI
 				lineLen += wlen;
 			}
 		}
-		if (!line.empty())
-			out << row(color + line + RESET) << std::endl;
+		flushLine();
 	}
 
 	// ── Print multi-line text (\r\n separated) in box rows ───────────────────
@@ -250,19 +272,23 @@ namespace CLI
 			{
 				if (!line.empty())
 				{
-					if ((int)line.size() > W - 2)
+					if ((int)visibleLen(line) > W - 2)
 						printWrapped(out, line, color);
 					else
 						out << row(color + line + RESET) << std::endl;
 				}
 				line.clear();
 			}
+			else if (text[i] == '\t')
+				line += "    ";
+			else if ((unsigned char)text[i] < 32)
+				continue;
 			else
 				line += text[i];
 		}
 		if (!line.empty())
 		{
-			if ((int)line.size() > W - 2)
+			if ((int)visibleLen(line) > W - 2)
 				printWrapped(out, line, color);
 			else
 				out << row(color + line + RESET) << std::endl;

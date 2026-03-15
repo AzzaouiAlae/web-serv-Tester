@@ -7,19 +7,16 @@
 //
 //   # 1. autoindex ON, no default index file
 //   location /autoindex-dir {
-//       root       <your-web-root>/autoindex-dir;
 //       autoindex  on;
 //   }
 //
 //   # 2. autoindex OFF, no default index file
 //   location /no-index-dir {
-//       root       <your-web-root>/no-index-dir;
 //       autoindex  off;
 //   }
 //
 //   # 3. autoindex ON but an index.htm IS present inside the directory
 //   location /auto-with-index {
-//       root       <your-web-root>/auto-with-index;
 //       autoindex  on;
 //       index      index.htm;
 //   }
@@ -77,9 +74,9 @@ void AutoIndexTests::AutoIndexEnabledTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: 'location /autoindex-dir { autoindex on; }' with no index file. "
 		"Create the directory and place at least one file inside it. "
 		"CRITICAL: The generated listing body MUST be accompanied by a correct "
@@ -119,9 +116,9 @@ void AutoIndexTests::AutoIndexDisabledTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 403 Forbidden";
+	testCase.expectedResponse.push_back("HTTP/1.1 403 Forbidden");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: 'location /no-index-dir { autoindex off; }' with NO index file. "
 		"The directory must physically exist — if it is missing the server returns "
 		"404 and this test fails for the wrong reason. "
@@ -170,9 +167,9 @@ void AutoIndexTests::AutoIndexShowsFilesTest()
 
 	// Substring match against the full response (headers + body).
 	// "test-file.txt" must appear in the generated listing HTML.
-	testCase.expectedResponse = "test-file.txt";
+	testCase.expectedResponse.push_back("test-file.txt");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/autoindex-dir/' as Test 1. "
 		"A file named exactly 'test-file.txt' must exist inside the directory — "
 		"create it with: echo \"hello\" > <web-root>/autoindex-dir/test-file.txt. "
@@ -219,9 +216,9 @@ void AutoIndexTests::AutoIndexContentTypeTest()
 		"\r\n";
 
 	// Matches "Content-Type: text/html" and also "Content-Type: text/html; charset=utf-8"
-	testCase.expectedResponse = "Content-Type: text/html";
+	testCase.expectedResponse.push_back("Content-Type: text/html");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same '/autoindex-dir/' as Test 1. "
 		"When the server generates a dynamic listing body it must assign the "
 		"MIME type 'text/html' in the Content-Type header, exactly as it would "
@@ -270,9 +267,9 @@ void AutoIndexTests::AutoIndexWithIndexFileTest()
 	// This token must be present verbatim inside auto-with-index/index.htm.
 	// It will never appear in a server-generated directory listing, so a match
 	// proves the index file was served, not the listing.
-	testCase.expectedResponse = "AUTO-INDEX-PRIORITY-CHECK";
+	testCase.expectedResponse.push_back("AUTO-INDEX-PRIORITY-CHECK");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: 'location /auto-with-index { autoindex on; index index.htm; }'. "
 		"Create the index file with: "
 		"echo '<html><body>AUTO-INDEX-PRIORITY-CHECK</body></html>' "

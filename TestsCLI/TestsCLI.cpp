@@ -13,6 +13,8 @@ void TestCLI::run()
 	while (true)
 	{
 		PrintScreen();
+		vector<int> choices = ReadChoices();
+		HandleChoices(choices);
 	}
 }
 
@@ -47,7 +49,6 @@ void TestCLI::PrintTestResult()
 
 void TestCLI::PrintScreen()
 {
-	int choice = 0;
 	CLI::printBanner();
 	cout << endl;
 	cout << CLI::topLine() << endl;
@@ -65,24 +66,62 @@ void TestCLI::PrintScreen()
 	if (exitNum.size() < 2) exitNum = " " + exitNum;
 	cout << CLI::row(string(CLR_MENU_NUM) + "  " + exitNum + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_FAIL + "Exit" + RESET) << endl;
 	cout << CLI::botLine() << endl;
-	cout << CLR_PROMPT << "  " << SYM_ARROW << " Choice: " << RESET;
-	choice = ATestList::readIntegerInput();
-	if (choice == 0) {
-		RunAllTests();
-	}
-	else if(choice < 1 || choice > (int)_testLists.size() + 1)
+}
+
+vector<int> TestCLI::ReadChoices()
+{
+	cout << CLR_PROMPT << "  " << SYM_ARROW << " Choice (e.g. 1 3 5 or 1-5): " << RESET;
+	string input = ATestList::readInput();
+	return ATestList::parseChoices(input);
+}
+
+void TestCLI::RunSelectedTests(vector<int> &choices)
+{
+	_failedTests = 0;
+	_passedTests = 0;
+	for (size_t c = 0; c < choices.size(); c++)
 	{
-		cerr << CLR_WARN << "  " << SYM_WARN << " Invalid choice." << RESET << endl;
+		int choice = choices[c];
+		if (choice >= 1 && choice <= (int)_testLists.size())
+		{
+			_testLists[choice - 1]->RunAllTests();
+			_failedTests += _testLists[choice - 1]->getFailedTests();
+			_passedTests += _testLists[choice - 1]->getPassedTests();
+		}
+		else
+			cerr << CLR_WARN << "  " << SYM_WARN << " Invalid choice: " << choice << RESET << endl;
 	}
-	else if(choice == (int)_testLists.size() + 1)
+	_testsCount = _failedTests + _passedTests;
+	PrintTestResult();
+	ATestList::preperForNextTest();
+}
+
+void TestCLI::HandleChoices(vector<int> &choices)
+{
+	if (choices.empty())
+		return;
+	if (choices.size() > 1)
 	{
-		cout << endl << CLR_DIM << "  Goodbye!" << RESET << endl << endl;
-		exit(0);
+		system("clear");
+		RunSelectedTests(choices);
 	}
 	else
 	{
-		system("clear");
-		_testLists[choice - 1]->ShowTestsList();
+		int choice = choices[0];
+		if (choice == 0)
+			RunAllTests();
+		else if (choice == (int)_testLists.size() + 1)
+		{
+			cout << endl << CLR_DIM << "  Goodbye!" << RESET << endl << endl;
+			exit(0);
+		}
+		else if (choice >= 1 && choice <= (int)_testLists.size())
+		{
+			system("clear");
+			_testLists[choice - 1]->ShowTestsList();
+		}
+		else
+			cerr << CLR_WARN << "  " << SYM_WARN << " Invalid choice: " << choice << RESET << endl;
 	}
 	system("clear");
 }

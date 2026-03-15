@@ -98,9 +98,9 @@ void RoutingTests::RootMappingTest()
 		"\r\n";
 
 	// Sentinel only exists in /tmp/mapped-root/index.htm
-	testCase.expectedResponse = "ROOT-MAPPING-SENTINEL";
+	testCase.expectedResponse.push_back("ROOT-MAPPING-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: 'location /mapped { root /tmp/mapped-root; index index.htm; }'. "
 		"Create: mkdir -p /tmp/mapped-root && "
 		"echo '<html><body>ROOT-MAPPING-SENTINEL</body></html>' > /tmp/mapped-root/index.htm. "
@@ -147,9 +147,9 @@ void RoutingTests::NestedPathResolutionTest()
 		"\r\n";
 
 	// Sentinel only exists inside <web-root>/static/a/b/nested.html
-	testCase.expectedResponse = "NESTED-PATH-SENTINEL";
+	testCase.expectedResponse.push_back("NESTED-PATH-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Create the directory chain and file: "
 		"mkdir -p <web-root>/static/a/b && "
 		"echo '<html><body>NESTED-PATH-SENTINEL</body></html>' "
@@ -192,9 +192,9 @@ void RoutingTests::TrailingSlashWithIndexTest()
 		"\r\n";
 
 	// Sentinel lives only in <web-root>/dir-with-index/index.htm
-	testCase.expectedResponse = "TRAILING-SLASH-SENTINEL";
+	testCase.expectedResponse.push_back("TRAILING-SLASH-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: 'location /dir-with-index { root <web-root>; index index.htm; }'. "
 		"Create: mkdir -p <web-root>/dir-with-index && "
 		"echo '<html><body>TRAILING-SLASH-SENTINEL</body></html>' "
@@ -245,9 +245,9 @@ void RoutingTests::NoTrailingSlashRedirectTest()
 
 	// Asserting on Location is stricter than asserting on the status line
 	// — it validates both that a redirect was issued AND the target is correct
-	testCase.expectedResponse = "Location: /dir-with-index/";
+	testCase.expectedResponse.push_back("Location: /dir-with-index/");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Same 'location /dir-with-index' from Test 3. "
 		"The server must detect that '/dir-with-index' (no trailing slash) maps "
 		"to a directory on disk and issue 301 with 'Location: /dir-with-index/'. "
@@ -289,14 +289,14 @@ void RoutingTests::QueryStringIgnoredTest()
 
 	// Query string appended — must be stripped before the path lookup
 	testCase.request =
-		"GET /index.htm?foo=bar&baz=qux HTTP/1.1\r\n"
+		"GET /QueryString/index.htm?foo=bar&baz=qux HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"\r\n";
 
 	// Sentinel lives in <web-root>/index.htm
-	testCase.expectedResponse = "QUERY-STRING-SENTINEL";
+	testCase.expectedResponse.push_back("QUERY-STRING-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: The main index.htm must contain the sentinel: "
 		"echo '<html><body>QUERY-STRING-SENTINEL</body></html>' > <web-root>/index.htm. "
 		"If this returns 404, the Path class is treating the full string "
@@ -346,9 +346,9 @@ void RoutingTests::PercentEncodedPathTest()
 		"\r\n";
 
 	// Sentinel lives in <web-root>/my page.html (space in filename)
-	testCase.expectedResponse = "PERCENT-ENCODE-SENTINEL";
+	testCase.expectedResponse.push_back("PERCENT-ENCODE-SENTINEL");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"SETUP: Create a file with a literal space in the name: "
 		"echo '<html><body>PERCENT-ENCODE-SENTINEL</body></html>' "
 		"> \"<web-root>/my page.html\"  (note the space between 'my' and 'page'). "

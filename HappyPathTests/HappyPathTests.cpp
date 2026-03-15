@@ -18,8 +18,8 @@ void HappyPathTests::GetIndexTest()
 	testCase.port = "1025";
 	testCase.host = "localhost";
 	testCase.request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
-	testCase.configFileData = "";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	testCase.configurationsForTestCase = "";
 	testCase.timeout = 2000;
 
 	RunTestCase(testCase);
@@ -35,8 +35,8 @@ void HappyPathTests::GetStaticHtmlTest()
 	testCase.host = "localhost";
 	// Explicitly asking for index.htm instead of just the / root
 	testCase.request = "GET /index.htm HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
-	testCase.configFileData = "";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	testCase.configurationsForTestCase = "";
 	testCase.timeout = 2000;
 
 	RunTestCase(testCase);
@@ -51,9 +51,9 @@ void HappyPathTests::GetBinaryFileTest()
 	testCase.port = "1025";
 	testCase.host = "localhost";
 	testCase.request = "GET /favicon.ico HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData = "NOTE: If this fails, ensure your server testCaseuration has a root directory mapped to '/' and that a valid binary file named 'favicon.ico' exists there. Your file reading logic must use read() and buffer sizes, NOT std::getline or string functions that break on \\0.";
+	testCase.configurationsForTestCase = "NOTE: If this fails, ensure your server testCaseuration has a root directory mapped to '/' and that a valid binary file named 'favicon.ico' exists there. Your file reading logic must use read() and buffer sizes, NOT std::getline or string functions that break on \\0.";
 
 	testCase.timeout = 2000;
 
@@ -71,9 +71,9 @@ void HappyPathTests::GetDirectoryWithTrailingSlashTest()
 
 	// Requesting a directory instead of a file
 	testCase.request = "GET /images/ HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData = "NOTE: Ensure you have an 'images' directory inside your web root. For this to return 200 OK, the server must either have directory listing (autoindex) enabled for this path, OR there must be a valid default index file (like index.htm) inside the 'images' folder.";
+	testCase.configurationsForTestCase = "NOTE: Ensure you have an 'images' directory inside your web root. For this to return 200 OK, the server must either have directory listing (autoindex) enabled for this path, OR there must be a valid default index file (like index.htm) inside the 'images' folder.";
 
 	testCase.timeout = 2000;
 
@@ -91,9 +91,9 @@ void HappyPathTests::HeadRequestTest()
 
 	// Sending a HEAD request instead of GET
 	testCase.request = "HEAD / HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse = "HTTP/1.1 501 Not Implemented";
+	testCase.expectedResponse.push_back("HTTP/1.1 501 Not Implemented");
 
-	testCase.configFileData = "NOTE: The server must return the exact same headers as a GET request (including Content-Length) but MUST NOT send any body content. Ensure your response logic doesn't skip writing the headers to the socket, and correctly closes/completes the request to avoid a timeout.";
+	testCase.configurationsForTestCase = "NOTE: The server must return the exact same headers as a GET request (including Content-Length) but MUST NOT send any body content. Ensure your response logic doesn't skip writing the headers to the socket, and correctly closes/completes the request to avoid a timeout.";
 
 	testCase.timeout = -1;
 
@@ -120,9 +120,9 @@ void HappyPathTests::PostSimpleTextTest()
 					   "\r\n"
 					   + body;
 
-	testCase.expectedResponse = "HTTP/1.1 201 Created";
+	testCase.expectedResponse.push_back("HTTP/1.1 201 Created");
 
-	testCase.configFileData = "NOTE: Ensure the server has a POST-enabled route for '/upload'. The route must accept 'text/plain' bodies and return 201 Created on success. The 'client_max_body_size' in your config must be at least 13 bytes.";
+	testCase.configurationsForTestCase = "NOTE: Ensure the server has a POST-enabled route for '/upload'. The route must accept 'text/plain' bodies and return 201 Created on success. The 'client_max_body_size' in your config must be at least 13 bytes.";
 
 	testCase.timeout = 2000;
 
@@ -143,9 +143,9 @@ void HappyPathTests::DeleteExistingFileTest()
 					   "Host: localhost\r\n"
 					   "\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 204 No Content";
+	testCase.expectedResponse.push_back("HTTP/1.1 204 No Content");
 
-	testCase.configFileData = "NOTE: Before running this test, ensure a file named 'delete_me.txt' exists inside the server's '/uploads' directory. The route for '/uploads' must have the DELETE method allowed in the config. On success the server must return 204 No Content with no body.";
+	testCase.configurationsForTestCase = "NOTE: Before running this test, ensure a file named 'delete_me.txt' exists inside the server's '/uploads' directory. The route for '/uploads' must have the DELETE method allowed in the config. On success the server must return 204 No Content with no body.";
 
 	testCase.timeout = 2000;
 
@@ -165,9 +165,9 @@ void HappyPathTests::GetCssFileTest()
 					   "Host: localhost\r\n"
 					   "\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData = "NOTE: Ensure a file named 'styles.css' exists in the server's web root. The server should respond with 'Content-Type: text/css' in the headers. This test validates that the MIME type resolution for '.css' extensions is implemented correctly.";
+	testCase.configurationsForTestCase = "NOTE: Ensure a file named 'styles.css' exists in the server's web root. The server should respond with 'Content-Type: text/css' in the headers. This test validates that the MIME type resolution for '.css' extensions is implemented correctly.";
 
 	testCase.timeout = 2000;
 
@@ -187,9 +187,9 @@ void HappyPathTests::GetImageFileTest()
 					   "Host: localhost\r\n"
 					   "\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData = "NOTE: Ensure a valid PNG file named 'test.png' exists inside the server's '/images' directory. The server should respond with 'Content-Type: image/png'. File reading must use binary-safe read() calls, not string-based functions, to avoid truncation on null bytes.";
+	testCase.configurationsForTestCase = "NOTE: Ensure a valid PNG file named 'test.png' exists inside the server's '/images' directory. The server should respond with 'Content-Type: image/png'. File reading must use binary-safe read() calls, not string-based functions, to avoid truncation on null bytes.";
 
 	testCase.timeout = 2000;
 
@@ -209,9 +209,9 @@ void HappyPathTests::GetLargeHtmlTest()
 					   "Host: localhost\r\n"
 					   "\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData = "NOTE: Ensure a file named 'large.html' exists in the server's web root. The file should be large enough (at minimum several KB, ideally >64KB) to force the server to send the response body across multiple send()/write() syscalls. This validates the server's chunked-send loop logic.";
+	testCase.configurationsForTestCase = "NOTE: Ensure a file named 'large.html' exists in the server's web root. The file should be large enough (at minimum several KB, ideally >64KB) to force the server to send the response body across multiple send()/write() syscalls. This validates the server's chunked-send loop logic.";
 
 	testCase.timeout = 5000;
 
@@ -223,26 +223,37 @@ void HappyPathTests::PostUploadBinaryFileTest()
 	// arrange
 	TestCase testCase;
 	testCase.name = "Post Upload Binary File Test";
-	testCase.description = "Test to check if the server correctly handles a POST request uploading a binary file (simulated PNG header bytes).";
+	testCase.description = "Test to check if the server correctly handles a POST request uploading a binary file (simulated PNG header bytes) as multipart form data.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
 	// PNG magic bytes: \x89PNG\r\n\x1a\n followed by minimal padding
-	string body = string("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR", 21);
+	string pngData = string("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR", 21);
+	
+	// Build multipart body
+	string boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+	string body;
+	
+	body += "--" + boundary + "\r\n";
+	body += "Content-Disposition: form-data; name=\"file\"; filename=\"image.png\"\r\n";
+	body += "Content-Type: image/png\r\n";
+	body += "\r\n";
+	body += pngData;
+	body += "\r\n--" + boundary + "--\r\n";
 
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload/image.png HTTP/1.1\r\n"
+		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Length: " + contentLength + "\r\n" 
-		"Content-Type: image/png\r\n"
+		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
 
-	testCase.expectedResponse = "HTTP/1.1 201 Created";
+	testCase.expectedResponse.push_back("HTTP/1.1 201 Created");
 
-	testCase.configFileData = "NOTE: This test sends a binary payload containing null bytes (\\x00). The server's multipart parser MUST NOT use string functions like strstr() or std::string::find() on the raw body if it relies on null-termination. Use memmem() or size-aware search instead. The upload directory must be writable.";
+	testCase.configurationsForTestCase = "NOTE: This test sends a multipart/form-data request with a binary PNG file upload containing null bytes (\\x00). The server's multipart parser MUST NOT use string functions like strstr() or std::string::find() on the raw body if it relies on null-termination. Use memmem() or size-aware search instead. The upload directory must be writable.";
 
 	testCase.timeout = 2000;
 
@@ -263,9 +274,9 @@ void HappyPathTests::DeleteBinaryFileTest()
 					   "Host: localhost\r\n"
 					   "\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 204 No Content";
+	testCase.expectedResponse.push_back("HTTP/1.1 204 No Content");
 
-	testCase.configFileData = "NOTE: Before running this test, ensure a file named 'image.png' exists inside the server's '/uploads' directory. The route for '/uploads' must have the DELETE method allowed in the config. On success the server must return 204 No Content with no body.";
+	testCase.configurationsForTestCase = "NOTE: Before running this test, ensure a file named 'image.png' exists inside the server's '/uploads' directory. The route for '/uploads' must have the DELETE method allowed in the config. On success the server must return 204 No Content with no body.";
 
 	testCase.timeout = 2000;
 
@@ -285,9 +296,9 @@ void HappyPathTests::GetAlternatePortTest()
 					   "Host: localhost:1026\r\n"
 					   "\r\n";
 
-	testCase.expectedResponse = "HTTP/1.1 200 OK";
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 
-	testCase.configFileData = "NOTE: Ensure your server config has a second 'server' block listening on port 1026 with a valid root and index file. This test validates that the multiplexer/epoll loop correctly handles multiple listening sockets simultaneously.";
+	testCase.configurationsForTestCase = "NOTE: Ensure your server config has a second 'server' block listening on port 1026 with a valid root and index file. This test validates that the multiplexer/epoll loop correctly handles multiple listening sockets simultaneously.";
 
 	testCase.timeout = 2000;
 

@@ -38,16 +38,16 @@ void ClientBodySizeTests::PostWellUnderLimitTest()
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload/file1.txt HTTP/1.1\r\n"
+		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"Content-Type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
 
-	testCase.expectedResponse = "HTTP/1.1 201 Created";
+	testCase.expectedResponse.push_back("HTTP/1.1 201 Created");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: Server config must have 'client_max_body_size 1024' on the "
 		"'/upload' location. A 13-byte body must be accepted without hitting "
 		"the size guard. If this fails with 413 your limit check is too eager.";
@@ -79,16 +79,16 @@ void ClientBodySizeTests::PostAtExactLimitTest()
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload/file2.txt HTTP/1.1\r\n"
+		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"Content-Type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
 
-	testCase.expectedResponse = "HTTP/1.1 201 Created";
+	testCase.expectedResponse.push_back("HTTP/1.1 201 Created");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: This test sends exactly 1024 bytes (matching 'client_max_body_size 1024'). "
 		"The server MUST accept it and return 201 Created. If it returns 413 your "
 		"comparison operator is wrong — use strictly-greater-than (body > limit), "
@@ -121,16 +121,16 @@ void ClientBodySizeTests::PostOneByteOverLimitTest()
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload/file3.txt HTTP/1.1\r\n"
+		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"Content-Type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
 
-	testCase.expectedResponse = "HTTP/1.1 413 Payload Too Large";
+	testCase.expectedResponse.push_back("HTTP/1.1 413 Payload Too Large");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: This test sends 1025 bytes (one over 'client_max_body_size 1024'). "
 		"The server should detect the oversize condition from the Content-Length "
 		"header BEFORE reading the body and respond with 413 immediately. "
@@ -166,16 +166,16 @@ void ClientBodySizeTests::PostLargeBodyRejectedTest()
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload/file4.txt HTTP/1.1\r\n"
+		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"Content-Type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
 
-	testCase.expectedResponse = "HTTP/1.1 413 Payload Too Large";
+	testCase.expectedResponse.push_back("HTTP/1.1 413 Payload Too Large");
 
-	testCase.configFileData =
+	testCase.configurationsForTestCase =
 		"NOTE: This test sends 10240 bytes (10x 'client_max_body_size 1024'). "
 		"The server must reject based on the Content-Length header without "
 		"allocating a 10KB buffer first. After returning 413, the server must "
