@@ -1,0 +1,311 @@
+
+Passing the test here is the minimum before going to an evaluation.
+press enter to continue
+THIS TEST IS NOT MEANT TO BE THE ONLY TEST IN THE EVALUATION!!!
+press enter to continue
+Before starting please follow the next few steps (files content can be anything and will be shown to you by the test):
+- Download the cgi_test executable on the host
+- Create a directory YoupiBanane with:
+	- A file name youpi.bad_extension
+	- A file name youpi.bla
+	- A sub directory called nop
+		- A file name youpi.bad_extension in nop
+		- A file name other.pouic in nop
+	- A sub directory called Yeah
+		- A file name not_happy.bad_extension in Yeah
+press enter to continue
+
+Setup the configuration file as follow:
+- / must answer to GET request ONLY
+- Any file with .bla as extension must answer to POST request by calling the cgi_test executable
+- /post_body must answer anything to POST request with a maxBody of 100
+- /directory/ must answer to GET request and the root of it would be the repository YoupiBanane and if no file are requested, it should search for youpi.bad_extension files
+
+config file
+server {
+    allow_methods GET;
+	root EngineX/www-subject-tester;
+	index index.htm;
+	autoindex on;
+
+	
+    location /directory/Yeah {
+		root EngineX/;
+	}
+
+	location /directory/Yeah/not_happy.bad_extension {
+		root EngineX/www-subject-tester;
+	}
+
+	location /post_body {
+		client_body_in_file_only on;
+		client_max_body_size 100b;
+		allow_methods POST;
+	}
+
+	location /directory/ {
+		index youpi.bad_extension;
+		allow_methods GET;
+	}
+
+	location /directory/ {
+		allow_methods POST;
+		cgi_pass .bla EngineX/www-subject-tester/cgi_tester;
+		chunked_send off;
+	}
+}
+
+types {
+	text/html  html htm;
+}
+
+-rwxr-xr-x. 1 aazzaoui aazzaoui 3997089 Mar 15 04:28 cgi_tester
+-rw-r--r--. 1 aazzaoui aazzaoui     207 Mar 15 17:48 index.htm
+
+directory:
+total 4
+drwxr-xr-x. 2 aazzaoui aazzaoui 52 Mar 15 04:39 nop
+drwxr-xr-x. 2 aazzaoui aazzaoui 37 Mar 15 04:39 Yeah
+-rw-r--r--. 1 aazzaoui aazzaoui  3 Mar 15 04:37 youpi.bad_extension
+-rw-r--r--. 1 aazzaoui aazzaoui  0 Mar 16 01:58 youpi.bla
+
+post_body:
+total 0
+
+YoupiBanane:
+total 0
+drwxr-xr-x. 2 aazzaoui aazzaoui 52 Mar 15 04:29 nop
+drwxr-xr-x. 2 aazzaoui aazzaoui 37 Mar 15 04:29 Yeah
+
+
+intra-tests 
+test-1 --> simple get should work
+"GET / HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n
+"\r\n"
+====================================
+test-2 --> POST on the / should return 405
+"POST / HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"0\r\n"
+"\r\n"
+====================================
+test-3 --> HEAD on the / should return 405 this not logic but this how test work
+"HEAD / HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"\r\n"
+====================================
+test-4  --> this should return redirection 301 to /directory/
+"GET /directory HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-5 --> this should return the content of youpi.bad_extension must test with /directory/youpi.bad_extension
+"GET /directory/ HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Referer: http://127.0.0.1:1025/directory\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-6 --> this should return 200
+"GET /directory/youpi.bad_extension HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-7 --> this should return 200 
+"GET /directory/youpi.bla HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-8 --> should return 404
+"GET /directory/oulalala HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-9 --> should return 301 to /directory/nop/
+"GET /directory/nop HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-10 --> should return 200 and autoindex "show files"
+"GET /directory/nop/ HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Referer: http://127.0.0.1:1025/directory/nop\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-11 --> should return 200 and autoindex "show files"
+"GET /directory/nop/ HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-12 --> should return 200 
+"GET /directory/nop/other.pouic HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-13 --> should return 200 
+"GET /directory/nop/other.pouac HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-14 --> should return 404 this is not logical but if you see the location /directory/Yeah and /directory/Yeah/not_happy.bad_extension has diffrent roots
+"GET /directory/Yeah HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n
+"\r\n"
+====================================
+test-15 --> this should return 200
+"GET /directory/Yeah/not_happy.bad_extension HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-16 -> send 100_000_000 y --> the test must send the number of 'y' chars it go throw the cgi and send result we will see the result after create the test do not get the response in memorie but save somthing like instractions example 'y' repete N times or ((8000\r\n, 'y'repeted N times)repeted N times)  must send 200 or 201
+"POST /directory/youpi.bla HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"8000\r\n"
+y...
+====================================
+test-17 -> send 100_000_000 e --> the same as test 16  must send 200 or 201
+"POST /directory/youpla.bla HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"8000\r\n"
+e...
+====================================
+test-18 --> send 100_000 e --> the same as test 16  must send 200 or 201
+"POST /directory/youpi.bla HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"X-Secret-Header-For-Test: 1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"8000\r\n"
+ee...
+====================================
+test-19 --> must send 200 or 201  must send 200 or 201
+"POST /post_body HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"0\r\n"
+"\r\n"
+====================================
+test-20 --> send 100 p  must send 200 or 201
+"POST /post_body HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"64\r\n"
+p..
+"0\r\n"
+"\r\n"
+====================================
+test-21 send 200 w  must send 200 or 201
+"POST /post_body HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"c8\r\n", 
+w..
+"0\r\n"
+"\r\n"
+====================================
+test-22 --> send 101 q  must send 200 or 201
+"POST /post_body HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n
+"\r\n"
+"65\r\n"
+q..
+"0\r\n"
+"\r\n"
+====================================
+test-23
+fork=5 request-per-process=20  must send 200
+"GET / HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-24
+fork=20 request-per-process=5000 must send 200
+"GET / HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+
+====================================
+test-25
+fork=128 request-per-process=50 must send 200
+"GET /directory/nop HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+====================================
+test-26
+fork=20 request-per-process=5 -> send 100_000_000 k same as test 16
+"POST /directory/youpi.bla HTTP/1.1\r\n"
+"Host: 127.0.0.1:1025\r\n"
+"User-Agent: Go-http-client/1.1\r\n"
+"Transfer-Encoding: chunked\r\n"
+"Content-Type: test/file\r\n"
+"Accept-Encoding: gzip\r\n"
+"\r\n"
+"8000\r\n"
+k...

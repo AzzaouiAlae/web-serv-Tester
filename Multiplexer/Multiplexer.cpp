@@ -11,12 +11,15 @@ Multiplexer::Multiplexer()
 {
 	currentMultiplexer = this;
 	count = 0;
+	epollFd = -1;
 
 	epoolInit();
 }
 
 void Multiplexer::epoolInit()
 {
+	if (epollFd != -1)
+		close(epollFd);
 	epollFd = epoll_create1(EPOLL_CLOEXEC);
 	eventList = new epoll_event[1024];
 }

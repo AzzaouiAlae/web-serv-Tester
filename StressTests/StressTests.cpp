@@ -650,8 +650,8 @@ void StressTests::KeepAliveConnectionEvictionTest()
 	cout << endl << "  " << CLI::runBadge() << "  " << CLR_STEP << "Keep-Alive Eviction" << RESET
 	     << CLR_DIM << " (up to " << KEEPALIVE_SWARM << " persistent sockets)" << RESET << endl;
 
-	vector<TestCase *> sockets;
-	sockets.reserve(KEEPALIVE_SWARM);
+	vector<TestCase *> testCases;
+	testCases.reserve(KEEPALIVE_SWARM);
 
 	int opened = 0;
 	int openFailures = 0;
@@ -707,7 +707,7 @@ void StressTests::KeepAliveConnectionEvictionTest()
 		}
 
 		multiplexer.DeleteFromEpoll(conn->socketIO);
-		sockets.push_back(conn);
+		testCases.push_back(conn);
 		opened++;
 	}
 	
@@ -716,7 +716,7 @@ void StressTests::KeepAliveConnectionEvictionTest()
 	extraConn.socket = -1;
 	extraConn.socketIO = NULL;
 
-	if (!sockets.empty())
+	if (!testCases.empty())
 	{
 		extraConn.host = "127.0.0.1";
 		extraConn.port = "1025";
@@ -728,11 +728,11 @@ void StressTests::KeepAliveConnectionEvictionTest()
 
 	bool keepAliveSanityOk = false;
 	size_t keepAliveSanityIndex = 0;
-	if (!sockets.empty())
+	if (!testCases.empty())
 	{
 		// Probe a near-tail socket to verify keep-alive still works on a non-oldest connection.
-		keepAliveSanityIndex = (sockets.size() > 20) ? (sockets.size() - 20) : (sockets.size() - 1);
-		TestCase *probe = sockets[keepAliveSanityIndex];
+		keepAliveSanityIndex = (testCases.size() > 20) ? (testCases.size() - 20) : (testCases.size() - 1);
+		TestCase *probe = testCases[keepAliveSanityIndex];
 		probe->request = keepAliveRequest;
 		probe->sendedBytes = 0;
 		probe->response.clear();
@@ -748,9 +748,9 @@ void StressTests::KeepAliveConnectionEvictionTest()
 	}
 
 	bool oldestClosed = false;
-	if (!sockets.empty())
+	if (!testCases.empty())
 	{
-		TestCase *oldest = sockets.front();
+		TestCase *oldest = testCases.front();
 		oldest->request = keepAliveRequest;
 		oldest->sendedBytes = 0;
 		oldest->response.clear();
@@ -770,10 +770,10 @@ void StressTests::KeepAliveConnectionEvictionTest()
 
 	if (extraConn.socketIO)
 		cleanupStressSocket(multiplexer, extraConn);
-	for (size_t i = 0; i < sockets.size(); i++)
+	for (size_t i = 0; i < testCases.size(); i++)
 	{
-		cleanupStressSocket(multiplexer, *sockets[i]);
-		delete sockets[i];
+		cleanupStressSocket(multiplexer, *testCases[i]);
+		delete testCases[i];
 	}
 
 	string synthetic;

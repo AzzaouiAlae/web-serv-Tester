@@ -82,20 +82,70 @@ void HappyPathTests::GetDirectoryWithTrailingSlashTest()
 
 void HappyPathTests::HeadRequestTest()
 {
-	// arrange
+	// Step 1: First, get the expected headers by sending a GET request
+	TestCase getCase;
+	getCase.name = "Head Request Test - Get Reference";
+	getCase.description = "Get the reference response headers for comparison with HEAD request.";
+	getCase.port = "1025";
+	getCase.host = "localhost";
+	getCase.request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+	getCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	getCase.timeout = 2000;
+	getCase.printTest = false; // Don't print this GET test in the summary
+
+	RunTestCase(getCase);
+
+	// Extract important headers from GET response (ignoring dynamic ones like Date, Set-Cookie)
+	vector<string> expectedStableHeaders;
+	if (getCase.headerLength > 0 && getCase.headerLength <= getCase.response.size())
+	{
+		string headers = getCase.response.substr(0, getCase.headerLength);
+		size_t pos = 0;
+		while ((pos = headers.find("\r\n", pos)) != string::npos)
+		{
+			if (pos == 0)
+			{
+				pos += 2;
+				continue;
+			}
+			size_t lineStart = headers.rfind("\r\n", pos - 1);
+			if (lineStart == string::npos)
+				lineStart = 0;
+			else
+				lineStart += 2;
+			
+			string line = headers.substr(lineStart, pos - lineStart);
+			
+			// Skip dynamic headers
+			if (line.find("Date:") == string::npos && 
+			    line.find("Set-Cookie:") == string::npos &&
+			    !line.empty() && line != "\r\n")
+			{
+				expectedStableHeaders.push_back(line);
+			}
+			pos += 2;
+		}
+	}
+
+	// Step 2: Test HEAD request - should return identical headers (except Date/Set-Cookie) but no body
 	TestCase testCase;
 	testCase.name = "Head Request Test";
-	testCase.description = "Test to check if the server correctly handles a HEAD request by returning headers without a response body.";
+	testCase.description = "Test to check if the server correctly handles a HEAD request by returning the same headers as GET but without a response body (excluding dynamic headers like Date and Set-Cookie).";
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
-	// Sending a HEAD request instead of GET
 	testCase.request = "HEAD / HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	testCase.expectedResponse.push_back("HTTP/1.1 501 Not Implemented");
+	
+	// Build expected response with stable headers
+	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	for (const auto &header : expectedStableHeaders)
+	{
+		testCase.expectedResponse.push_back(header);
+	}
 
-	testCase.configurationsForTestCase = "NOTE: The server must return the exact same headers as a GET request (including Content-Length) but MUST NOT send any body content. Ensure your response logic doesn't skip writing the headers to the socket, and correctly closes/completes the request to avoid a timeout.";
+	testCase.configurationsForTestCase = "NOTE: A HEAD request must return the exact same headers as a GET request (Content-Length, Content-Type, Allow, Server, etc.) but MUST NOT send any response body. Dynamic headers like Date and Set-Cookie are ignored in this comparison. This test first retrieves the headers from a GET request to '/', then verifies that HEAD returns identical stable headers without any body content.";
 
-	testCase.timeout = -1;
+	testCase.timeout = 2000;
 
 	RunTestCase(testCase);
 }
@@ -223,7 +273,7 @@ void HappyPathTests::PostUploadBinaryFileTest()
 	// arrange
 	TestCase testCase;
 	testCase.name = "Post Upload Binary File Test";
-	testCase.description = "Test to check if the server correctly handles a POST request uploading a binary file (simulated PNG header bytes) as multipart form data.";
+	testCase.description = "Test to check if the server correctly handles a POST request uploading a binary file (simulated PNG header bytes) as multipart form data, and verify the file is saved correctly.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
@@ -253,7 +303,66 @@ void HappyPathTests::PostUploadBinaryFileTest()
 
 	testCase.expectedResponse.push_back("HTTP/1.1 201 Created");
 
-	testCase.configurationsForTestCase = "NOTE: This test sends a multipart/form-data request with a binary PNG file upload containing null bytes (\\x00). The server's multipart parser MUST NOT use string functions like strstr() or std::string::find() on the raw body if it relies on null-termination. Use memmem() or size-aware search instead. The upload directory must be writable.";
+	testCase.configurationsForTestCase = "NOTE: This test uploads a binary PNG file via multipart/form-data containing null bytes (\\x00), then retrieves it to verify correct parsing and storage. The server's multipart parser MUST use size-aware parsing (memmem, memcmp) and NOT string functions like strstr() or std::string::find() that rely on null-termination.";
+
+	testCase.timeout = 2000;
+
+	testCase.printTest = false;
+
+	RunTestCase(testCase);
+
+	// Step 2: Verify the upload by retrieving the file
+	TestCase verifyCase;
+	verifyCase.name = "Post Upload Binary File Test - Verify";
+	verifyCase.description = "Retrieve the uploaded binary file and verify data integrity.";
+	verifyCase.port = "1025";
+	verifyCase.host = "localhost";
+	verifyCase.request = "GET /upload/image.png HTTP/1.1\r\nHost: localhost\r\n\r\n";
+	verifyCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	verifyCase.expectedResponse.push_back(pngData);
+	verifyCase.configurationsForTestCase = "This GET request retrieves the uploaded binary file to verify that the multipart parser correctly extracted and saved the binary data with null bytes intact. The response body must contain the exact PNG data.";
+	verifyCase.timeout = 2000;
+
+	RunTestCase(verifyCase);
+}
+
+void HappyPathTests::PostOnRootTest()
+{
+	// arrange
+	TestCase testCase;
+	testCase.name = "Post On Root Test";
+	testCase.description = "Test to check if the server correctly handles a POST request sent to the root path.";
+
+	testCase.port = "1025";
+	testCase.host = "localhost";
+
+	// PNG magic bytes: \x89PNG\r\n\x1a\n followed by minimal padding
+	string pngData = string("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR", 21);
+	
+	// Build multipart body
+	string boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+	string body;
+	
+	body += "--" + boundary + "\r\n";
+	body += "Content-Disposition: form-data; name=\"file\"; filename=\"image.png\"\r\n";
+	body += "Content-Type: image/png\r\n";
+	body += "\r\n";
+	body += pngData;
+	body += "\r\n--" + boundary + "--\r\n";
+
+	string contentLength = to_string(body.size());
+
+	testCase.request =
+		"POST / HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"Content-Length: " + contentLength + "\r\n"
+		"\r\n"
+		+ body;
+
+	testCase.expectedResponse.push_back("HTTP/1.1 201 Created");
+
+	testCase.configurationsForTestCase = "NOTE: This test uploads a binary PNG file via multipart/form-data containing null bytes (\\x00), then retrieves it to verify correct parsing and storage. The server's multipart parser MUST use size-aware parsing (memmem, memcmp) and NOT string functions like strstr() or std::string::find() that rely on null-termination.";
 
 	testCase.timeout = 2000;
 
@@ -318,6 +427,7 @@ void HappyPathTests::AddAllTests()
 	_testFunctions.push_back( make_pair("Get Image File Test",                (void (ATestList::*)())&HappyPathTests::GetImageFileTest) );
 	_testFunctions.push_back( make_pair("Get Large Html Test",                (void (ATestList::*)())&HappyPathTests::GetLargeHtmlTest) );
 	_testFunctions.push_back( make_pair("Post Upload Binary File Test",       (void (ATestList::*)())&HappyPathTests::PostUploadBinaryFileTest) );
+	_testFunctions.push_back( make_pair("Post On Root Test",                  (void (ATestList::*)())&HappyPathTests::PostOnRootTest) );
 	_testFunctions.push_back( make_pair("Get Alternate Port Test",            (void (ATestList::*)())&HappyPathTests::GetAlternatePortTest) );
 	_testFunctions.push_back( make_pair("Delete Binary File Test",            (void (ATestList::*)())&HappyPathTests::DeleteBinaryFileTest) );
 }

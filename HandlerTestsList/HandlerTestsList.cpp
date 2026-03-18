@@ -18,6 +18,7 @@ void HandlerTestsList::CreateTests() {
 	_sessionTests           = new SessionTests();
 	_stressTests            = new StressTests();
 	_pathTests              = new PathTests();
+	_minimumEvaluationTests  = new MinimumEvaluationTests();
 }
 
 HandlerTestsList::~HandlerTestsList() {

@@ -1,5 +1,84 @@
 #include "ATestList.hpp"
 
+// Decompress chunked-encoded body
+static bool decodeChunkedBodyForDisplay(const string &chunkedBody, string &decodedBody)
+{
+	decodedBody.clear();
+	size_t cursor = 0;
+
+	while (true)
+	{
+		size_t sizeLineEnd = chunkedBody.find("\r\n", cursor);
+		if (sizeLineEnd == string::npos)
+			return false;
+
+		string sizeLine = chunkedBody.substr(cursor, sizeLineEnd - cursor);
+		size_t extensionPos = sizeLine.find(';');
+		if (extensionPos != string::npos)
+			sizeLine = sizeLine.substr(0, extensionPos);
+		if (sizeLine.empty())
+			return false;
+
+		char *endPtr = NULL;
+		unsigned long chunkSize = strtoul(sizeLine.c_str(), &endPtr, 16);
+		if (endPtr == NULL || *endPtr != '\0')
+			return false;
+
+		cursor = sizeLineEnd + 2;
+		if (chunkSize == 0)
+			return true;
+
+		if (cursor + chunkSize + 2 > chunkedBody.size())
+			return false;
+		decodedBody.append(chunkedBody, cursor, chunkSize);
+		cursor += chunkSize;
+		if (chunkedBody.compare(cursor, 2, "\r\n") != 0)
+			return false;
+		cursor += 2;
+	}
+}
+
+// Compress repeated characters for display (e.g., "YYYY..." becomes "Y repeated 1000000000 times")
+static string compressRepeatedCharsForDisplay(const string &body, size_t maxDisplayLength = 100)
+{
+	if (body.empty())
+		return body;
+
+	// Check if body is mostly repetitions of a single character
+	if (body.size() > maxDisplayLength)
+	{
+		char firstChar = body[0];
+		bool isRepetitive = true;
+
+		// Check a sample of the body to see if it's repetitive
+		for (size_t i = 0; i < min(body.size(), (size_t)1000); ++i)
+		{
+			if (body[i] != firstChar)
+			{
+				isRepetitive = false;
+				break;
+			}
+		}
+
+		if (isRepetitive)
+		{
+			// Count how many times the character appears
+			size_t count = 0;
+			for (size_t i = 0; i < body.size() && body[i] == firstChar; ++i)
+				++count;
+
+			if (count == body.size())
+			{
+				stringstream result;
+				result << "'" << firstChar << "' repeated " << body.size() << " times";
+				return result.str();
+			}
+		}
+	}
+
+	return body;
+}
+
 namespace
 {
 
@@ -74,6 +153,7 @@ vector<ATestList *> ATestList::_testLists;
 ATestList::ATestList(const string &name) : _name(name), _showSingleTestDetails(false)
 {
 	_testLists.push_back(this);
+	isListOfTests = false;
 }
 
 string ATestList::getName() const
@@ -109,11 +189,23 @@ void ATestList::printTestCard(TestCase &config)
 	cout << CLI::botLine() << endl;
 }
 
+void failChild(TestCase &config, string failedPattern)
+{
+	if (config.childIndex != -1)
+	{
+		int fail = -(config.childIndex + 1);
+		write(config.pipeFd[1], &fail, sizeof(int));
+		CLI::printError("Child failed, " + failedPattern);
+		sleep(7);
+	}
+}
+
 bool ATestList::connectToServer(TestCase &config)
 {
 	config.socket = Socket::inetConnect(config.host, config.port, SOCK_STREAM);
 	if (config.socket == -1)
 	{
+		failChild(config, "connectToServer");
 		CLI::printError("Failed to connect to the server.");
 		return false;
 	}
@@ -121,63 +213,237 @@ bool ATestList::connectToServer(TestCase &config)
 	return true;
 }
 
+static string toHex(size_t value)
+{
+	stringstream hexStream;
+	hexStream << hex << value;
+	return hexStream.str();
+}
+
+void ATestList::CreateChunkedBody(TestCase &config)
+{
+	config.chunkGenerated = config.bodyDescription.find("chunked") != string::npos;
+	if (!config.chunkGenerated)
+		return;
+
+	char bodyChar = 'x';
+	size_t charStart = config.bodyDescription.find("'");
+	if (charStart != string::npos && charStart + 2 < config.bodyDescription.size())
+	{
+		bodyChar = config.bodyDescription[charStart + 1];
+	}
+	// Generate only ONE chunk
+	config.chunkedBodyStart = generateChunkStartHeader(config.bodyDescription, config.chunkSize);
+	config.chunkedBodyStart += generateBodySegment(bodyChar, config.chunkSize);
+	config.chunkedBodyStart += "\r\n";
+
+	// Calculate how many times this chunk repeats
+	config.chunksRemaining = config.bodyTotalSize / config.chunkSize;
+
+	// Handle remainder
+	size_t remainder = config.bodyTotalSize % config.chunkSize;
+	if (remainder)
+	{
+		config.chunkedBodyEnd = ::toHex(remainder) + "\r\n";
+		config.chunkedBodyEnd += generateBodySegment(bodyChar, remainder);
+		config.chunkedBodyEnd += "\r\n0\r\n\r\n";
+	}
+	else
+	{
+		config.chunkedBodyEnd = "0\r\n\r\n";
+	}
+}
+
+int ATestList::SendChunkedBody(TestCase &config)
+{
+	int sentBytes = 0;
+
+	// Phase 1: Send complete chunks repeatedly
+	if (config.chunksRemaining > 0 && !config.sendingEndChunk)
+	{
+		size_t remainingInChunk = config.chunkedBodyStart.size() - config.chunkedBodyStartSentBytes;
+		size_t toSend = (remainingInChunk > config.maxSend) ? config.maxSend : remainingInChunk;
+
+		sentBytes = config.socketIO->Send(
+			(void *)(config.chunkedBodyStart.c_str() + config.chunkedBodyStartSentBytes),
+			toSend);
+
+		if (sentBytes > 0)
+		{
+			config.chunkedBodyStartSentBytes += sentBytes;
+			config.sendedBytes += sentBytes;
+
+			// If we sent complete chunk, reset counter and decrement chunks remaining
+			if (config.chunkedBodyStartSentBytes >= config.chunkedBodyStart.size())
+			{
+				config.chunkedBodyStartSentBytes = 0;
+				config.chunksRemaining--;
+
+				// If no more complete chunks, switch to sending end chunk
+				if (config.chunksRemaining == 0)
+				{
+					config.sendingEndChunk = true;
+				}
+			}
+		}
+
+		return sentBytes;
+	}
+
+	// Phase 2: Send remainder chunk + terminator
+	if (config.sendingEndChunk && config.chunkedBodyEndSentBytes < config.chunkedBodyEnd.size())
+	{
+		size_t remainingEnd = config.chunkedBodyEnd.size() - config.chunkedBodyEndSentBytes;
+		size_t toSend = (remainingEnd > config.maxSend) ? config.maxSend : remainingEnd;
+
+		sentBytes = config.socketIO->Send(
+			(void *)(config.chunkedBodyEnd.c_str() + config.chunkedBodyEndSentBytes),
+			toSend);
+
+		if (sentBytes > 0)
+		{
+			config.chunkedBodyEndSentBytes += sentBytes;
+			config.sendedBytes += sentBytes;
+		}
+
+		return sentBytes;
+	}
+
+	// All chunks sent
+	return 0;
+}
+
 bool ATestList::SendRequestToServer(TestCase &config)
 {
 	multiplexer.AddAsEpollOut(config.socketIO);
-	while (config.sendedBytes < config.request.size())
+	multiplexer.ChangeToEpollInOut(config.socketIO);
+	CreateChunkedBody(config);
+
+	size_t headerSize = config.request.size();
+	bool headerSendComplete = false;
+
+	while (true)
 	{
 		int size = multiplexer.epollWait(config.timeout);
 		if (size == -1)
 		{
+			failChild(config, "epollWait -1");
 			CLI::printError("Failed to wait for events.");
 			return false;
 		}
 		else if (size == 0)
 		{
+			failChild(config, "epollWait timeout");
 			CLI::printError("Timeout while waiting for EpollOut events.");
 			return false;
 		}
 		else if ((multiplexer.eventList[0].events & EPOLLOUT) == 0)
 		{
-			CLI::printError("Send Request Unexpected event type.");
-			return false;
+			return true;
 		}
-		int sentBytes = config.socketIO->Send((void *)(config.request.c_str() + config.sendedBytes), config.request.size() - config.sendedBytes);
-		if (config.socketIO->errorNumber)
+
+		int sentBytes = 0;
+
+		// Phase 1: Send headers
+		if (!headerSendComplete)
 		{
-			CLI::printError("Failed to send request to the server.");
-			return false;
+			int toSend = headerSize - config.sendedBytes;
+			if (toSend > (int)config.maxSend)
+				toSend = (int)config.maxSend;
+
+			sentBytes = config.socketIO->Send((void *)(config.request.c_str() + config.sendedBytes), toSend);
+			if (config.socketIO->errorNumber)
+			{
+				failChild(config, "send header");
+				CLI::printError("Failed to send request to the server.");
+				return false;
+			}
+			if (sentBytes > 0)
+			{
+				config.sendedBytes += sentBytes;
+			}
+
+			if (config.sendedBytes >= headerSize)
+			{
+				headerSendComplete = true;
+			}
 		}
-		else if (sentBytes > 0)
-			config.sendedBytes += sentBytes;
+		else if (config.chunkGenerated)
+		{
+			// Phase 2: Send chunked body (start + end)
+			sentBytes = SendChunkedBody(config);
+
+			if (config.socketIO->errorNumber)
+			{
+				failChild(config, "send chunked body");
+				CLI::printError("Failed to send chunked body.");
+				return false;
+			}
+
+			// Check if all chunked body sent
+			if (config.chunksRemaining == 0 && config.sendingEndChunk &&
+				config.chunkedBodyEndSentBytes >= config.chunkedBodyEnd.size())
+			{
+				break;
+			}
+		}
+		else
+		{
+			// No chunked body, headers sent - done
+			return true;
+		}
+
+		if (isListOfTests == false && headerSendComplete)
+		{
+			system("clear");
+			printTestCard(config);
+			size_t totalSize = headerSize + config.bodyTotalSize;
+			CLI::printHint("Sending request to server... (" + to_string(config.sendedBytes) + "/" + to_string(totalSize) + " bytes sent)");
+		}
+		usleep(config.sleepTime);
+	}
+	if (config.childIndex != -1)
+	{	
+		size_t totalSize = headerSize + config.bodyTotalSize;
+		CLI::printHint("Child " + to_string(config.childIndex) + ": Sending request to server... (" + to_string(config.sendedBytes) + "/" + to_string(totalSize) + " bytes sent)");
 	}
 	return true;
 }
 
 bool ATestList::ReadResponseFromServer(TestCase &config)
 {
+	bool isHeadRequest = config.request.find("HEAD ") == 0;
 	multiplexer.ChangeToEpollIn(config.socketIO);
 	while (true)
 	{
 		int size = multiplexer.epollWait(config.timeout);
+		if (size <= 0 && isHeadRequest &&
+			GetResponseHeaderLength(config.response, config.headerLength))
+		{
+			break;
+		}
 		if (size == -1)
 		{
+			failChild(config, "epollWait -1");
 			CLI::printError("Failed to wait for events.");
 			return false;
 		}
 		else if (size == 0)
 		{
+			failChild(config, "epollWait timeout");
 			CLI::printError("Timeout while waiting for EpollIn events.");
 			return false;
 		}
 		else if ((multiplexer.eventList[0].events & EPOLLIN) == 0)
 		{
+			failChild(config, "Read Response Unexpected event type");
 			CLI::printError("Read Response Unexpected event type.");
 			return false;
 		}
 		int receivedBytes = read(config.socketIO->GetFd(), config.responseBuffer, KBYTE);
 		if (receivedBytes == -1)
 		{
+			failChild(config, "Failed to receive response from the server");
 			CLI::printError("Failed to receive response from the server.");
 			return false;
 		}
@@ -273,26 +539,47 @@ void ATestList::rePrintTest(TestCase &config)
 
 void ATestList::actServerResponse(TestCase &config)
 {
+	// Extract response body for pattern matching
+	string responseBody;
+	if (config.headerLength > 0 && config.headerLength <= config.response.size())
+	{
+		responseBody = config.response.substr(config.headerLength);
+	}
+
 	bool allMatched = !config.expectedResponse.empty();
 	string failedPattern;
 	for (size_t i = 0; i < config.expectedResponse.size(); i++)
 	{
 		const string &pattern = config.expectedResponse[i];
 		bool matched = false;
+
 		// Support OR with "||": "patternA||patternB" passes if either matches
 		size_t pos = 0;
 		size_t sep;
 		while ((sep = pattern.find("||", pos)) != string::npos)
 		{
-			if (config.response.find(pattern.substr(pos, sep - pos)) != string::npos)
-			{
-				matched = true;
+			string subPattern = pattern.substr(pos, sep - pos);
+			// Use smart pattern matching for repeated character patterns
+			if (subPattern.find(" repeated ") != string::npos)
+				matched = matchesBodyPattern(responseBody, subPattern);
+			else
+				matched = (config.response.find(subPattern) != string::npos);
+
+			if (matched)
 				break;
-			}
 			pos = sep + 2;
 		}
-		if (!matched && config.response.find(pattern.substr(pos)) != string::npos)
-			matched = true;
+
+		if (!matched)
+		{
+			string finalPattern = pattern.substr(pos);
+			// Use smart pattern matching for repeated character patterns
+			if (finalPattern.find(" repeated ") != string::npos)
+				matched = matchesBodyPattern(responseBody, finalPattern);
+			else
+				matched = (config.response.find(finalPattern) != string::npos);
+		}
+
 		if (!matched)
 		{
 			allMatched = false;
@@ -305,17 +592,24 @@ void ATestList::actServerResponse(TestCase &config)
 		config.passed = true;
 		_passedTests++;
 		_failedTests--;
-		cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+		if (config.printTest)
+		{
+			cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+		}
 	}
 	else
 	{
+		failChild(config, "Response did not match expected pattern: " + failedPattern);
 		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET;
 		if (!failedPattern.empty())
 			cerr << CLR_DIM << "  (missing: " << failedPattern << ")" << RESET;
 		cerr << endl;
 	}
 	string responseHeader = config.response.substr(0, config.headerLength);
-	printServerResponseHeader(config);
+	if (config.printTest || config.passed == false)
+	{
+		printServerResponseHeader(config);
+	}
 }
 
 long ATestList::CurrentTime()
@@ -398,13 +692,23 @@ void ATestList::printServerResponseHeader(TestCase &config)
 		{
 			cout << CLI::row(string(CLR_HEADER) + SYM_RAQUO + " Tester Body" + RESET) << endl;
 			cout << CLI::midLine() << endl;
-			CLI::printLines(cout, requestBody.empty() ? string("(empty)") : requestBody, CLR_DIM);
+			string bodyToDisplay = requestBody;
+			// If request uses chunked encoding, decode it first before displaying
+			if (toLowerCopy(requestHeader).find("transfer-encoding: chunked") != string::npos)
+			{
+				string decodedBody;
+				if (decodeChunkedBodyForDisplay(requestBody, decodedBody))
+					bodyToDisplay = decodedBody;
+			}
+			string compressedBody = compressRepeatedCharsForDisplay(bodyToDisplay);
+			CLI::printLines(cout, compressedBody.empty() ? string("(empty)") : compressedBody, CLR_DIM);
 		}
 		else if (choice == "2")
 		{
 			cout << CLI::row(string(CLR_HEADER) + SYM_RAQUO + " Server Body" + RESET) << endl;
 			cout << CLI::midLine() << endl;
-			CLI::printLines(cout, responseBody.empty() ? string("(empty)") : responseBody, CLR_DIM);
+			string compressedBody = compressRepeatedCharsForDisplay(responseBody);
+			CLI::printLines(cout, compressedBody.empty() ? string("(empty)") : compressedBody, CLR_DIM);
 		}
 		else
 		{
@@ -412,7 +716,7 @@ void ATestList::printServerResponseHeader(TestCase &config)
 			cout << CLI::midLine() << endl;
 			CLI::printLines(cout, config.configurationsForTestCase.empty() ? string("(empty)") : config.configurationsForTestCase, CLR_DIM);
 		}
-		
+
 		cout << CLI::botLine() << endl;
 		cout << CLR_PROMPT << "  " << SYM_ARROW << " Press Enter to continue..." << RESET;
 		readInput();
@@ -429,10 +733,127 @@ void ATestList::preperForNextTest()
 	system("clear");
 }
 
+bool ATestList::matchesBodyPattern(const string &responseBody, const string &pattern)
+{
+	// Checks if responseBody matches pattern like "'K' repeated 100000000 times"
+	// Extracts character and count from pattern and validates
+	if (pattern.empty() || responseBody.empty())
+		return pattern == responseBody;
+
+	size_t repPos = pattern.find(" repeated ");
+	size_t timesPos = pattern.find(" times");
+	if (repPos == string::npos || timesPos == string::npos)
+	{
+		// Not a repeated pattern, use standard string matching
+		return responseBody.find(pattern) != string::npos;
+	}
+
+	// Extract character (between quotes)
+	size_t charStart = pattern.find("'");
+	if (charStart == string::npos || charStart + 2 >= pattern.size())
+		return responseBody.find(pattern) != string::npos;
+	char expectedChar = pattern[charStart + 1];
+
+	// Extract expected count
+	size_t countStart = repPos + 9;
+	size_t countEnd = timesPos;
+	string countStr = pattern.substr(countStart, countEnd - countStart);
+	size_t expectedCount = strtoull(countStr.c_str(), NULL, 10);
+
+	// Count matches in response body
+	if (responseBody.empty())
+		return expectedCount == 0;
+
+	// Check if first character matches
+	if (responseBody[0] != expectedChar)
+		return false;
+
+	// Count consecutive matching characters
+	size_t actualCount = 0;
+	for (size_t i = 0; i < responseBody.size() && responseBody[i] == expectedChar; ++i)
+		++actualCount;
+
+	// If entire body is this character and count matches, it's valid
+	return (actualCount == responseBody.size()) && (actualCount == expectedCount);
+}
+
+string ATestList::generateChunkStartHeader(const string &description, size_t &outChunkSize)
+{
+	// Parse description and generate the first chunk header
+	// For chunked encoding format: "'K' repeated 100000000 times chunked size 32768"
+	// Returns just the hex size line: "8000\r\n" (where 8000 is 32768 in hex)
+	// outChunkSize is set to the chunk size extracted from description
+
+	outChunkSize = 32768; // default
+
+	if (description.empty())
+		return "";
+
+	// Check if chunked encoding requested
+	if (description.find("chunked") == string::npos)
+		return ""; // Not chunked, no header needed
+
+	// Extract chunk size from description
+	size_t sizePos = description.find(" size ");
+	if (sizePos != string::npos)
+	{
+		string sizeStr = description.substr(sizePos + 6);
+		outChunkSize = strtoull(sizeStr.c_str(), NULL, 10);
+	}
+
+	// Generate hex header for the chunk
+	return ::toHex(outChunkSize) + "\r\n";
+}
+
+string ATestList::generateBodySegment(char bodyChar, size_t segmentSize)
+{
+	// Generate a segment of body data (raw characters, no HTTP framing)
+	return string(segmentSize, bodyChar);
+}
+
+size_t ATestList::getBodyTotalSize(const string &description)
+{
+	// Parse "X repeated N times [chunked size S]" and return total body size
+	if (description.empty())
+		return 0;
+
+	size_t repPos = description.find(" repeated ");
+	size_t timesPos = description.find(" times");
+	if (repPos == string::npos || timesPos == string::npos)
+		return 0;
+
+	size_t countStart = repPos + 9;
+	size_t countEnd = timesPos;
+	string countStr = description.substr(countStart, countEnd - countStart);
+	size_t bodySize = strtoull(countStr.c_str(), NULL, 10);
+
+	return bodySize;
+}
+
 void ATestList::RunTestCase(TestCase &config)
 {
+	// Reset tracking variables for new test
+	config.sendedBytes = 0;
+	config.chunkedBodyStartSentBytes = 0;
+	config.chunkedBodyEndSentBytes = 0;
+	config.chunksRemaining = 0;
+	config.sendingEndChunk = false;
+	config.chunkGenerated = false;
+
+	// Setup body description for progressive generation
+	if (!config.body.empty())
+	{
+		config.bodyDescription = config.body;
+		config.bodyTotalSize = getBodyTotalSize(config.body);
+		config.bodyGeneratedBytes = 0;
+		config.isBodyGenerationComplete = false;
+	}
+
 	// act
-	printTestCard(config);
+	if (config.printTest)
+	{
+		printTestCard(config);
+	}
 	if (!connectToServer(config))
 		return;
 	if (!SendRequestToServer(config))
@@ -565,11 +986,13 @@ void ATestList::ShowTestsList()
 		{
 			_failedTests = choices.size();
 			_passedTests = 0;
+			isListOfTests = true;
 		}
 		for (size_t c = 0; c < choices.size(); c++)
 			performTestCase(choices[c]);
 		if (multiChoice)
 			PrintTestResult();
+		isListOfTests = false;
 		_showSingleTestDetails = false;
 		preperForNextTest();
 	}
@@ -579,6 +1002,7 @@ void ATestList::RunAllTests()
 {
 	_showSingleTestDetails = false;
 	ResetTestResults();
+	isListOfTests = true;
 	for (size_t i = 0; i < _testFunctions.size(); i++)
 	{
 		(this->*(_testFunctions[i].second))();
@@ -586,6 +1010,7 @@ void ATestList::RunAllTests()
 			 << CLI::thickSeparator() << endl
 			 << endl;
 	}
+	isListOfTests = false;
 }
 
 void ATestList::performTestCase(int choice)
@@ -602,5 +1027,207 @@ void ATestList::performTestCase(int choice)
 	else
 	{
 		(this->*(_testFunctions[choice - 1].second))();
+	}
+}
+
+bool ATestList::createPipe(TestCase &config)
+{
+	// Create pipe for parent-child communication
+	if (pipe(config.pipeFd) == -1)
+	{
+		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET << " (pipe creation failed)" << endl;
+		return false;
+	}
+	return true;
+}
+
+bool ATestList::forkChildProcess(TestCase &config)
+{
+	config.childIndex = 0;
+	for (int i = 0; i < config.forkCount; i++, config.childIndex++)
+	{
+		pid_t pid = fork();
+		if (pid == -1)
+		{
+			// Fork failed - kill all previously created children
+			for (pid_t childPid : config.childPids)
+			{
+				kill(childPid, SIGTERM);
+			}
+			cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET << " (fork failed)" << endl;
+			close(config.pipeFd[0]);
+			close(config.pipeFd[1]);
+			return false;
+		}
+		else if (pid != 0)
+		{
+			// Parent process - track child PID
+			config.childPids.push_back(pid);
+		}
+		else
+		{
+			// Child process - close read end of pipe and return to run test case
+			config.parentProcess = false;
+			close(config.pipeFd[0]);
+			return true;
+		}
+	}
+	return true;
+}
+
+bool ATestList::runChildTestCase(TestCase &childConfig)
+{
+	int childSuccessCount = 0;
+	int pass = 1;
+	// int fail = -(childConfig.childIndex + 1);
+	isListOfTests = true;
+	multiplexer.epoolInit();
+	close(childConfig.pipeFd[0]);
+	for (int j = 0; j < childConfig.totalRequests; ++j)
+	{
+		childConfig.sendedBytes = 0;
+		childConfig.response.clear();
+		childConfig.headerLength = 0;
+		childConfig.contentLength = 0;
+
+		RunTestCase(childConfig);
+		if (childConfig.passed)
+		{
+			write(childConfig.pipeFd[1], &pass, sizeof(int));
+			childSuccessCount++;
+		}
+
+		multiplexer.DeleteFromEpoll(childConfig.socketIO);
+		delete childConfig.socketIO;
+	}
+
+	write(childConfig.pipeFd[1], &childSuccessCount, sizeof(int));
+	close(childConfig.pipeFd[1]);
+
+	exit(childSuccessCount == childConfig.totalRequests ? 0 : 1);
+}
+
+void ATestList::getChildResults(TestCase &config)
+{
+	close(config.pipeFd[1]);
+
+	int totalSuccessCount = 0;
+	bool anyChildFailed = false;
+	int failedChildIndex = -1;
+	int totalExpected = config.forkCount * config.totalRequests;
+	int percentStep;
+	if (totalExpected > 1000)
+		percentStep = totalExpected / 20;
+	else if (totalExpected > 100)
+		percentStep = totalExpected / 10;
+	else
+		percentStep = 1;
+	for (int i = 0; i < totalExpected; i++)
+	{
+		int childSuccess = 0;
+		ssize_t bytesRead = read(config.pipeFd[0], &childSuccess, sizeof(int));
+
+		if (bytesRead > 0)
+		{
+			if (childSuccess <= 0)
+			{
+				anyChildFailed = true;
+				if (childSuccess < 0)
+					failedChildIndex = -childSuccess - 1;
+				break;
+			}
+			else
+			{
+				totalSuccessCount++;
+				if (isListOfTests == false && totalSuccessCount % percentStep == 0)
+				{
+					// system("clear");
+					// printTestCard(config);
+					CLI::printHint("request pass test... (" + to_string(totalSuccessCount) + "/" + to_string(totalExpected) + " bytes sent)");
+				}
+				else if (totalSuccessCount % percentStep == 0)
+				{
+					CLI::printHint("Progress: " + to_string(totalSuccessCount) + "/" + to_string(totalExpected) + " OK");
+				}
+			}
+		}
+		else
+		{
+			anyChildFailed = true;
+		}
+	}
+	close(config.pipeFd[0]);
+
+	if (anyChildFailed)
+	{
+		int status;
+		pid_t childPid;
+		for (size_t i = 0; i < config.childPids.size(); ++i)
+		{
+			childPid = config.childPids[i];
+			if (failedChildIndex >= 0 && static_cast<int>(i) == failedChildIndex)
+			{
+				continue;
+			}
+			if (waitpid(childPid, &status, WNOHANG) == 0)
+			{
+				kill(childPid, SIGTERM);
+				waitpid(childPid, &status, 0);
+			}
+		}
+		if (failedChildIndex >= 0)
+		{
+			childPid = config.childPids[failedChildIndex];
+			waitpid(childPid, &status, 0);
+		}
+	}
+	else
+	{
+		int status;
+		for (pid_t childPid : config.childPids)
+		{
+			waitpid(childPid, &status, 0);
+		}
+	}
+	printForkChildTestResult(config, totalSuccessCount, anyChildFailed, failedChildIndex);
+}
+
+void ATestList::printForkChildTestResult(TestCase &config, int totalSuccessCount, bool anyChildFailed, int failedChildIndex)
+{
+	if (totalSuccessCount == config.totalRequests * config.forkCount && !anyChildFailed)
+	{
+		config.passed = true;
+		_passedTests++;
+		_failedTests--;
+		cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET
+			 << " (" << totalSuccessCount << "/" << config.totalRequests * config.forkCount << " OK)" << endl;
+	}
+	else
+	{
+		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET
+			 << " (" << totalSuccessCount << "/" << config.totalRequests * config.forkCount << " OK)";
+		if (failedChildIndex >= 0)
+			cerr << CLR_DIM << "  [child " << failedChildIndex << " failed]" << RESET;
+		cerr << endl;
+	}
+}
+
+void ATestList::RunForkChildTestCase(TestCase &config)
+{
+	if (!createPipe(config))
+	{
+		return;
+	}
+	if (!forkChildProcess(config))
+	{
+		return;
+	}
+	if (!config.parentProcess)
+	{
+		runChildTestCase(config);
+	}
+	else
+	{
+		getChildResults(config);
 	}
 }

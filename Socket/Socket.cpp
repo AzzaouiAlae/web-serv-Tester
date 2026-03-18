@@ -61,12 +61,10 @@ int Socket::inetPassiveSocket(const char *host, const char *service, int type,
 			continue;
 		if (doListen)
 		{
-			if (rp->ai_family != AF_INET6)
-				res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-								&optVal, sizeof(optVal));
-			else
-				res = setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY,
-								&optVal, sizeof(optVal));
+			if (rp->ai_family == AF_INET6)
+				res = setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &optVal, sizeof(optVal));
+			res = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optVal, sizeof(optVal));
+			res += setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &optVal, sizeof(optVal));
 			if (res != 0)
 			{
 				close(sock);

@@ -7,11 +7,11 @@ class Multiplexer
 {
 	int count;
 	int epollFd;
-	void epoolInit();
 	static Multiplexer *currentMultiplexer;
 	int timeout;
 	bool stopEvntLoop;
 public:
+	void epoolInit();
 	epoll_event *eventList;
 	Multiplexer();
 	~Multiplexer();
