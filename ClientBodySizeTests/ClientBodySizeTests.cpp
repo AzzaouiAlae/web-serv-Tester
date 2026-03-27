@@ -28,7 +28,7 @@ void ClientBodySizeTests::PostWellUnderLimitTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Post Well Under Limit Test";
+	testCase.name        = "1 » Post Well Under Limit Test";
 	testCase.description = "Test to check that a POST body significantly smaller "
 	                       "than client_max_body_size is accepted and returns 201 Created.";
 	testCase.port        = "1025";
@@ -67,7 +67,7 @@ void ClientBodySizeTests::PostAtExactLimitTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Post At Exact Limit Test";
+	testCase.name        = "2 » Post At Exact Limit Test";
 	testCase.description = "Test to check that a POST body whose size equals "
 	                       "client_max_body_size exactly is accepted (boundary "
 	                       "value — the check must be body_size > limit, not >=).";
@@ -79,7 +79,7 @@ void ClientBodySizeTests::PostAtExactLimitTest()
 	string contentLength = to_string(body.size());
 
 	testCase.request =
-		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
+		"POST /upload/ HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"Content-Type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
@@ -110,7 +110,7 @@ void ClientBodySizeTests::PostOneByteOverLimitTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Post One Byte Over Limit Test";
+	testCase.name        = "3 » Post One Byte Over Limit Test";
 	testCase.description = "Test to check that a POST body one byte larger than "
 	                       "client_max_body_size is rejected with 413 Content Too Large.";
 	testCase.port        = "1025";
@@ -154,7 +154,7 @@ void ClientBodySizeTests::PostLargeBodyRejectedTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Post Large Body Rejected Test";
+	testCase.name        = "4 » Post Large Body Rejected Test";
 	testCase.description = "Test to check that a POST body far exceeding "
 	                       "client_max_body_size is rejected with 413 and that "
 	                       "the server remains operational afterwards.";

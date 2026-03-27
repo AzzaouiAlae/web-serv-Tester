@@ -320,6 +320,13 @@ bool ATestList::SendRequestToServer(TestCase &config)
 	CreateChunkedBody(config);
 
 	size_t headerSize = config.request.size();
+	size_t totalSize = headerSize;
+	if (config.chunkGenerated)
+	{
+		size_t totalChunkCount = config.chunksRemaining;
+		size_t totalChunkedBytes = totalChunkCount * config.chunkedBodyStart.size() + config.chunkedBodyEnd.size();
+		totalSize += totalChunkedBytes;
+	}
 	bool headerSendComplete = false;
 
 	while (true)
@@ -347,12 +354,12 @@ bool ATestList::SendRequestToServer(TestCase &config)
 		// Phase 1: Send headers
 		if (!headerSendComplete)
 		{
-			int toSend = headerSize - config.sendedBytes;
-			if (toSend > (int)config.maxSend)
-				toSend = (int)config.maxSend;
+			size_t toSend = headerSize - config.sendedBytes;
+			if (toSend > config.maxSend)
+				toSend = config.maxSend;
 
 			sentBytes = config.socketIO->Send((void *)(config.request.c_str() + config.sendedBytes), toSend);
-			if (config.socketIO->errorNumber)
+			if (sentBytes <= 0)
 			{
 				failChild(config, "send header");
 				CLI::printError("Failed to send request to the server.");
@@ -373,11 +380,9 @@ bool ATestList::SendRequestToServer(TestCase &config)
 			// Phase 2: Send chunked body (start + end)
 			sentBytes = SendChunkedBody(config);
 
-			if (config.socketIO->errorNumber)
+			if (sentBytes <= 0)
 			{
-				failChild(config, "send chunked body");
-				CLI::printError("Failed to send chunked body.");
-				return false;
+				break;
 			}
 
 			// Check if all chunked body sent
@@ -390,19 +395,21 @@ bool ATestList::SendRequestToServer(TestCase &config)
 		else
 		{
 			// No chunked body, headers sent - done
-			return true;
+			break;
 		}
 
-		if (isListOfTests == false && headerSendComplete)
+		if (config.isSubTest == false && config.printTest)
 		{
-			system("clear");
-			printTestCard(config);
-			size_t totalSize = headerSize + config.bodyTotalSize;
-			CLI::printHint("Sending request to server... (" + to_string(config.sendedBytes) + "/" + to_string(totalSize) + " bytes sent)");
+			CLI::printHintProgress("Sending request to server... (" + to_string(config.sendedBytes) + "/" + to_string(totalSize) + " bytes sent)");
 		}
 		usleep(config.sleepTime);
 	}
-	if (config.childIndex != -1)
+	if (config.isSubTest == false && config.printTest)
+	{
+		CLI::printHintProgress("Sending request to server... (" + to_string(config.sendedBytes) + "/" + to_string(totalSize) + " bytes sent)");
+		cout << endl;
+	}
+	if (config.childIndex != -1 && config.isSubTest == false)
 	{	
 		size_t totalSize = headerSize + config.bodyTotalSize;
 		CLI::printHint("Child " + to_string(config.childIndex) + ": Sending request to server... (" + to_string(config.sendedBytes) + "/" + to_string(totalSize) + " bytes sent)");
@@ -589,24 +596,34 @@ void ATestList::actServerResponse(TestCase &config)
 	}
 	if (allMatched)
 	{
-		config.passed = true;
-		_passedTests++;
-		_failedTests--;
-		if (config.printTest)
+		if (!config.isSubTest)
 		{
-			cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+			config.passed = true;
+			_passedTests++;
+			_failedTests--;
+			if (config.printTest)
+			{
+				cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+			}
+		}
+		else
+		{
+			config.passed = true;
 		}
 	}
 	else
 	{
 		failChild(config, "Response did not match expected pattern: " + failedPattern);
-		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET;
-		if (!failedPattern.empty())
-			cerr << CLR_DIM << "  (missing: " << failedPattern << ")" << RESET;
-		cerr << endl;
+		if (!config.isSubTest)
+		{
+			cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET;
+			if (!failedPattern.empty())
+				cerr << CLR_DIM << "  (missing: " << failedPattern << ")" << RESET;
+			cerr << endl;
+		}
 	}
 	string responseHeader = config.response.substr(0, config.headerLength);
-	if (config.printTest || config.passed == false)
+	if (!config.isSubTest && (config.printTest || config.passed == false))
 	{
 		printServerResponseHeader(config);
 	}
@@ -679,11 +696,12 @@ void ATestList::printServerResponseHeader(TestCase &config)
 		cout << CLI::row(string(CLR_MENU_NUM) + "  1" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + "Print Tester Body" + RESET) << endl;
 		cout << CLI::row(string(CLR_MENU_NUM) + "  2" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + "Print Server Body" + RESET) << endl;
 		cout << CLI::row(string(CLR_MENU_NUM) + "  3" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + "Print configurationsForTestCase" + RESET) << endl;
+		cout << CLI::row(string(CLR_MENU_NUM) + "  4" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + "Re-run Test" + RESET) << endl;
 		cout << CLI::botLine() << endl;
 
-		cout << CLR_PROMPT << "  " << SYM_ARROW << " Detail option (1-3, Enter to return): " << RESET;
+		cout << CLR_PROMPT << "  " << SYM_ARROW << " Detail option (1-4, Enter to return): " << RESET;
 		string choice = readInput();
-		if (choice.empty() || (choice != "1" && choice != "2" && choice != "3"))
+		if (choice.empty() || (choice != "1" && choice != "2" && choice != "3" && choice != "4"))
 			return;
 		system("clear");
 		cout << endl;
@@ -710,11 +728,15 @@ void ATestList::printServerResponseHeader(TestCase &config)
 			string compressedBody = compressRepeatedCharsForDisplay(responseBody);
 			CLI::printLines(cout, compressedBody.empty() ? string("(empty)") : compressedBody, CLR_DIM);
 		}
-		else
+		else if (choice == "3")
 		{
 			cout << CLI::row(string(CLR_HEADER) + SYM_RAQUO + " configurationsForTestCase" + RESET) << endl;
 			cout << CLI::midLine() << endl;
 			CLI::printLines(cout, config.configurationsForTestCase.empty() ? string("(empty)") : config.configurationsForTestCase, CLR_DIM);
+		}
+		else if (choice == "4") {
+			_reRunTest = true;
+			return;
 		}
 
 		cout << CLI::botLine() << endl;
@@ -832,6 +854,9 @@ size_t ATestList::getBodyTotalSize(const string &description)
 
 void ATestList::RunTestCase(TestCase &config)
 {
+	do {
+		_reRunTest = false;
+	
 	// Reset tracking variables for new test
 	config.sendedBytes = 0;
 	config.chunkedBodyStartSentBytes = 0;
@@ -839,6 +864,7 @@ void ATestList::RunTestCase(TestCase &config)
 	config.chunksRemaining = 0;
 	config.sendingEndChunk = false;
 	config.chunkGenerated = false;
+	config.response.clear();
 
 	// Setup body description for progressive generation
 	if (!config.body.empty())
@@ -869,6 +895,7 @@ void ATestList::RunTestCase(TestCase &config)
 	// assert
 	actServerResponse(config);
 	multiplexer.DeleteFromEpoll(config.socketIO);
+	} while (_reRunTest);
 }
 
 void ATestList::PrintTestResult()
@@ -1077,6 +1104,7 @@ bool ATestList::forkChildProcess(TestCase &config)
 
 bool ATestList::runChildTestCase(TestCase &childConfig)
 {
+	childConfig.isSubTest = true;
 	int childSuccessCount = 0;
 	int pass = 1;
 	// int fail = -(childConfig.childIndex + 1);
@@ -1095,6 +1123,8 @@ bool ATestList::runChildTestCase(TestCase &childConfig)
 		{
 			write(childConfig.pipeFd[1], &pass, sizeof(int));
 			childSuccessCount++;
+		} else {
+			break;
 		}
 
 		multiplexer.DeleteFromEpoll(childConfig.socketIO);
@@ -1115,13 +1145,8 @@ void ATestList::getChildResults(TestCase &config)
 	bool anyChildFailed = false;
 	int failedChildIndex = -1;
 	int totalExpected = config.forkCount * config.totalRequests;
-	int percentStep;
-	if (totalExpected > 1000)
-		percentStep = totalExpected / 20;
-	else if (totalExpected > 100)
-		percentStep = totalExpected / 10;
-	else
-		percentStep = 1;
+	int percentStep = totalExpected / 100;
+	if (percentStep == 0) percentStep = 1;
 	for (int i = 0; i < totalExpected; i++)
 	{
 		int childSuccess = 0;
@@ -1139,15 +1164,8 @@ void ATestList::getChildResults(TestCase &config)
 			else
 			{
 				totalSuccessCount++;
-				if (isListOfTests == false && totalSuccessCount % percentStep == 0)
-				{
-					// system("clear");
-					// printTestCard(config);
-					CLI::printHint("request pass test... (" + to_string(totalSuccessCount) + "/" + to_string(totalExpected) + " bytes sent)");
-				}
-				else if (totalSuccessCount % percentStep == 0)
-				{
-					CLI::printHint("Progress: " + to_string(totalSuccessCount) + "/" + to_string(totalExpected) + " OK");
+				if (totalSuccessCount % percentStep == 0) {
+					CLI::printHintProgress("request pass test... (" + to_string(totalSuccessCount) + "/" + to_string(totalExpected) + " OK)");
 				}
 			}
 		}
@@ -1156,6 +1174,7 @@ void ATestList::getChildResults(TestCase &config)
 			anyChildFailed = true;
 		}
 	}
+	cout << endl;
 	close(config.pipeFd[0]);
 
 	if (anyChildFailed)
@@ -1228,6 +1247,7 @@ void ATestList::RunForkChildTestCase(TestCase &config)
 	}
 	else
 	{
+		printTestCard(config);
 		getChildResults(config);
 	}
 }

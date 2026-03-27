@@ -51,7 +51,7 @@ void RedirectionTests::PermanentRedirectStatusTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Permanent Redirect Status Test";
+	testCase.name        = "1 » Permanent Redirect Status Test";
 	testCase.description = "Test to check that the server returns the correct "
 	                       "'301 Moved Permanently' status line when a route "
 	                       "is configured with 'return 301 /new-page'.";
@@ -89,7 +89,7 @@ void RedirectionTests::PermanentRedirectLocationHeaderTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Permanent Redirect Location Header Test";
+	testCase.name        = "2 » Permanent Redirect Location Header Test";
 	testCase.description = "Test to check that the 301 response for '/old-page' "
 	                       "contains a 'Location: /new-page' header pointing to "
 	                       "the correct redirect destination.";
@@ -129,7 +129,7 @@ void RedirectionTests::TemporaryRedirectStatusTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Temporary Redirect Status Test";
+	testCase.name        = "3 » Temporary Redirect Status Test";
 	testCase.description = "Test to check that the server returns the correct "
 	                       "'302 Found' status line when a route is configured "
 	                       "with 'return 302 /index.htm'.";
@@ -165,7 +165,7 @@ void RedirectionTests::TemporaryRedirectLocationHeaderTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Temporary Redirect Location Header Test";
+	testCase.name        = "4 » Temporary Redirect Location Header Test";
 	testCase.description = "Test to check that the 302 response for '/temp-page' "
 	                       "contains a 'Location: /index.htm' header pointing "
 	                       "to the correct redirect destination.";
@@ -206,7 +206,7 @@ void RedirectionTests::RedirectToExternalUrlTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Redirect To External Url Test";
+	testCase.name        = "5 » Redirect To External Url Test";
 	testCase.description = "Test to check that the server correctly places an "
 	                       "absolute external URL in the Location header when "
 	                       "the 'return' directive specifies a full http:// URL.";

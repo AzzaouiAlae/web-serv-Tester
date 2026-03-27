@@ -84,7 +84,7 @@ void RoutingTests::RootMappingTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Root Mapping Test";
+	testCase.name        = "1 » Root Mapping Test";
 	testCase.description = "Test to check that the server correctly applies a "
 	                       "custom 'root' directive — stripping the location "
 	                       "prefix and prepending the configured root path before "
@@ -98,6 +98,7 @@ void RoutingTests::RootMappingTest()
 		"\r\n";
 
 	// Sentinel only exists in /tmp/mapped-root/index.htm
+	testCase.expectedResponse.push_back("200 OK");
 	testCase.expectedResponse.push_back("ROOT-MAPPING-SENTINEL");
 
 	testCase.configurationsForTestCase =
@@ -134,7 +135,7 @@ void RoutingTests::NestedPathResolutionTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Nested Path Resolution Test";
+	testCase.name        = "2 » Nested Path Resolution Test";
 	testCase.description = "Test to check that the server correctly resolves a "
 	                       "deeply nested URL path (multiple subdirectory levels) "
 	                       "by appending all path segments to the configured root.";
@@ -142,11 +143,12 @@ void RoutingTests::NestedPathResolutionTest()
 	testCase.host        = "localhost";
 
 	testCase.request =
-		"GET /static/a/b/nested.html HTTP/1.1\r\n"
+		"GET /static/a/b/nested.htm HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"\r\n";
 
 	// Sentinel only exists inside <web-root>/static/a/b/nested.html
+	testCase.expectedResponse.push_back("200 OK");
 	testCase.expectedResponse.push_back("NESTED-PATH-SENTINEL");
 
 	testCase.configurationsForTestCase =
@@ -178,7 +180,7 @@ void RoutingTests::TrailingSlashWithIndexTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Trailing Slash With Index Test";
+	testCase.name        = "3 » Trailing Slash With Index Test";
 	testCase.description = "Test to check that requesting a directory URL with a "
 	                       "trailing slash causes the server to serve the configured "
 	                       "index file — verified by a sentinel string in the body, "
@@ -230,7 +232,7 @@ void RoutingTests::NoTrailingSlashRedirectTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "No Trailing Slash Redirect Test";
+	testCase.name        = "4 » No Trailing Slash Redirect Test";
 	testCase.description = "Test to check that requesting a directory URL without "
 	                       "a trailing slash causes the server to return a 301 "
 	                       "redirect to the same URL with a trailing slash appended.";
@@ -279,7 +281,7 @@ void RoutingTests::QueryStringIgnoredTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Query String Ignored Test";
+	testCase.name        = "5 » Query String Ignored Test";
 	testCase.description = "Test to check that the server strips the query string "
 	                       "from the URL before resolving the filesystem path — "
 	                       "a request for '/index.htm?foo=bar' must serve the same "
@@ -331,7 +333,7 @@ void RoutingTests::PercentEncodedPathTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Percent Encoded Path Test";
+	testCase.name        = "6 » Percent Encoded Path Test";
 	testCase.description = "Test to check that the server correctly percent-decodes "
 	                       "the request URL before resolving the filesystem path — "
 	                       "a request for '/my%%20page.html' must serve the file "
@@ -341,12 +343,13 @@ void RoutingTests::PercentEncodedPathTest()
 
 	// %20 is the percent-encoded representation of a space character
 	testCase.request =
-		"GET /my%20page.html HTTP/1.1\r\n"
+		"GET /my%20page.htm HTTP/1.1\r\n"
 		"Host: localhost\r\n"
 		"\r\n";
 
 	// Sentinel lives in <web-root>/my page.html (space in filename)
 	testCase.expectedResponse.push_back("PERCENT-ENCODE-SENTINEL");
+	testCase.expectedResponse.push_back("200 OK");
 
 	testCase.configurationsForTestCase =
 		"SETUP: Create a file with a literal space in the name: "

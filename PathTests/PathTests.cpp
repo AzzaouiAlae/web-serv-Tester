@@ -16,7 +16,7 @@ PathTests::~PathTests()
 void PathTests::NotFoundFileTest()
 {
 	TestCase testCase;
-	testCase.name             = "Not Found File Test";
+	testCase.name             = "1 » Not Found File Test";
 	testCase.description      = "Server must return 404 when requesting a file that does not exist.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -31,7 +31,7 @@ void PathTests::NotFoundFileTest()
 void PathTests::NotFoundDirectoryTest()
 {
 	TestCase testCase;
-	testCase.name             = "Not Found Directory Test";
+	testCase.name             = "2 » Not Found Directory Test";
 	testCase.description      = "Server must return 404 when requesting a directory path that does not exist.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -50,7 +50,7 @@ void PathTests::NotFoundDirectoryTest()
 void PathTests::ForbiddenFileTest()
 {
 	TestCase testCase;
-	testCase.name             = "Forbidden File Test";
+	testCase.name             = "3 » Forbidden File Test";
 	testCase.description      = "Server must return 403 when requesting a file with chmod 000.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -66,7 +66,7 @@ void PathTests::ForbiddenFileTest()
 void PathTests::ForbiddenDirectoryTest()
 {
 	TestCase testCase;
-	testCase.name             = "Forbidden Directory Test";
+	testCase.name             = "4 » Forbidden Directory Test";
 	testCase.description      = "Server must return 403 when requesting a directory with chmod 000.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -82,7 +82,7 @@ void PathTests::ForbiddenDirectoryTest()
 void PathTests::DirectoryWithoutIndexTest()
 {
 	TestCase testCase;
-	testCase.name             = "Directory Without Index Test";
+	testCase.name             = "5 » Directory Without Index Test";
 	testCase.description      = "Server must return 403 for a readable directory with no index file and autoindex disabled.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -102,7 +102,7 @@ void PathTests::DirectoryWithoutIndexTest()
 void PathTests::PathTraversalTest()
 {
 	TestCase testCase;
-	testCase.name             = "Path Traversal Test";
+	testCase.name             = "6 » Path Traversal Test";
 	testCase.description      = "Server must delete raw '../' and return the normalized path in the URI (security critical).";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -118,7 +118,7 @@ void PathTests::PathTraversalTest()
 void PathTests::EncodedTraversalTest()
 {
 	TestCase testCase;
-	testCase.name             = "Encoded Path Traversal Test";
+	testCase.name             = "7 » Encoded Path Traversal Test";
 	testCase.description      = "Server must reject percent-encoded traversal (%2e%2e%2f) after URI decoding.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -135,7 +135,7 @@ void PathTests::EncodedTraversalTest()
 void PathTests::NullByteInPathTest()
 {
 	TestCase testCase;
-	testCase.name             = "Null Byte In Path Test";
+	testCase.name             = "8 » Null Byte In Path Test";
 	testCase.description      = "Server must reject URIs containing %00 (null byte) – classic C-string truncation attack.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -151,7 +151,7 @@ void PathTests::NullByteInPathTest()
 void PathTests::DoubleSlashPathTest()
 {
 	TestCase testCase;
-	testCase.name             = "Double Slash Path Test";
+	testCase.name             = "9 » Double Slash Path Test";
 	testCase.description      = "Server must normalize '//' to '/' and still serve the resource correctly.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";
@@ -171,7 +171,7 @@ void PathTests::DoubleSlashPathTest()
 void PathTests::VeryLongPathTest()
 {
 	TestCase testCase;
-	testCase.name             = "Very Long Path Test";
+	testCase.name             = "10 » Very Long Path Test";
 	testCase.description      = "Server must return 414 URI Too Long when the request URI exceeds the configured limit.";
 	testCase.port             = "1025";
 	testCase.host             = "localhost";

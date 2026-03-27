@@ -74,7 +74,7 @@ void CGITests::CgiGetRequestTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI Get Request Test";
+	testCase.name        = "1 » CGI Get Request Test";
 	testCase.description = "Test to check the basic CGI execution pipeline: "
 	                       "server detects .py extension, forks and execs the "
 	                       "interpreter, captures stdout, and forwards the body "
@@ -136,7 +136,7 @@ void CGITests::CgiPostWithBodyTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI Post With Body Test";
+	testCase.name        = "2 » CGI Post With Body Test";
 	testCase.description = "Test to check that the server correctly pipes the "
 	                       "POST request body to the CGI script's stdin — the "
 	                       "script echoes it back and a match proves end-to-end "
@@ -209,7 +209,7 @@ void CGITests::CgiEnvVarsTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI Env Vars Test";
+	testCase.name        = "3 » CGI Env Vars Test";
 	testCase.description = "Test to check that the server populates the CGI "
 	                       "environment correctly — the script prints "
 	                       "'REQUEST_METHOD=GET' and a match confirms the env "
@@ -275,7 +275,7 @@ void CGITests::CgiNoContentLengthTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI No Content Length Test";
+	testCase.name        = "4 » CGI No Content Length Test";
 	testCase.description = "Test to check that when a CGI script does not output "
 	                       "a Content-Length header, the server buffers all CGI "
 	                       "stdout until EOF and injects the correct Content-Length "
@@ -311,7 +311,7 @@ void CGITests::CgiNoContentLengthTest()
 		"If it returns a 200 but 'Content-Length:' is not found in the response, "
 		"the injection code path is skipped when CGI omits the header.";
 
-	testCase.timeout = -1;
+	testCase.timeout = 10000; 
 
 	RunTestCase(testCase);
 }
@@ -342,7 +342,7 @@ void CGITests::CgiQueryStringTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI Query String Test";
+	testCase.name        = "5 » CGI Query String Test";
 	testCase.description = "Test to check that the server correctly extracts the "
 	                       "query string from the request URL and passes it to "
 	                       "the CGI as the QUERY_STRING environment variable "
@@ -413,7 +413,7 @@ void CGITests::CgiWorkingDirectoryTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI Working Directory Test";
+	testCase.name        = "6 » CGI Working Directory Test";
 	testCase.description = "Test to check that the server sets the CGI working "
 	                       "directory to the script's own directory before exec() "
 	                       "— the script opens 'data.txt' by bare filename only, "
@@ -485,7 +485,7 @@ void CGITests::CgiTimeoutTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "CGI Timeout Test";
+	testCase.name        = "7 » CGI Timeout Test";
 	testCase.description = "Test to check that when a CGI script hangs (sleeps "
 	                       "for 30 s), the server detects the timeout, kills the "
 	                       "CGI process, and returns 504 Gateway Timeout before "

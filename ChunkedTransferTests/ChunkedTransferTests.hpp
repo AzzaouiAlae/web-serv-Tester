@@ -9,6 +9,20 @@ class ChunkedTransferTests : public ATestList
 	void ChunkedBodySizeLimitTest();
 	void ChunkedEmptyBodyTest();
 	void ChunkedMultipartTest();
+
+	// New multipart + chunked interaction tests (declared here, implemented later)
+	void BoundarySplitAcrossChunksTest();
+	void MultiFileUploadTest();
+	void MultipleFieldsTest();
+	void MalformedBoundaryTest();
+	void MissingClosingBoundaryTest();
+	void BinaryDataTest();
+	void LargeFileStreamTest();
+	void SlowUploadByteByByteTest();
+	void PrematureEOFTest();
+	void ChunkExtensionsAndTrailersTest();
+	void ChunkSizeEdgeCasesTest();
+	void ContentDispositionAndFilenameTest();
 public:
 	void AddAllTests();
 	ChunkedTransferTests();

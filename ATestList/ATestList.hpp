@@ -45,6 +45,7 @@ struct TestCase
 	size_t chunkedBodyEndSentBytes;
 	size_t chunksRemaining;
 	bool sendingEndChunk;
+	bool isSubTest;
 	int childIndex; // For tracking which child process is sending in forked tests
 	TestCase() : sendedBytes(0), passed(false), printTest(true), bodyGeneratedBytes(0), bodyTotalSize(0),
 				 isBodyGenerationComplete(false), chunkGenerated(false), chunkSize(32768),
@@ -56,6 +57,9 @@ struct TestCase
 		socketIO = NULL;
 		parentProcess = true;
 		childIndex = -1;
+		isSubTest = false;
+		sleepTime = 100;
+		maxSend = 50;
 	}
 	~TestCase()
 	{
@@ -75,6 +79,7 @@ class ATestList
 	int _failedTests;
 	int _passedTests;
 	bool _showSingleTestDetails;
+	bool _reRunTest;
 	static bool GetContentLength(string &response, size_t &contentLength);
 	static bool GetResponseHeaderLength(string &response, size_t &headerLength);
 	static bool IsChunkedTransferEncoding(const string &response, size_t headerLength);

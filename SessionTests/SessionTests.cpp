@@ -159,7 +159,7 @@ void SessionTests::SetCookieOnFirstVisitTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Set Cookie On First Visit Test";
+	testCase.name        = "1 » Set Cookie On First Visit Test";
 	testCase.description = "Test to check that the server issues a Set-Cookie "
 	                       "header when a client connects for the first time "
 	                       "with no existing Cookie header.";
@@ -210,7 +210,7 @@ void SessionTests::CookieValueNotEmptyTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Cookie Value Not Empty Test";
+	testCase.name        = "2 » Cookie Value Not Empty Test";
 	testCase.description = "Test to check that the Set-Cookie header uses the "
 	                       "expected cookie name (SESSION_COOKIE_NAME constant) "
 	                       "and begins to assign a value — confirming the session "
@@ -312,7 +312,7 @@ void SessionTests::HttpCookieEnvVarTest()
 	multiplexer.DeleteFromEpoll(setupCase.socketIO);
 	// ── Step 2: send cookie back, assert CGI echoes it ───────────────────────
 	TestCase testCase;
-	testCase.name        = "HTTP Cookie Env Var Test";
+	testCase.name        = "3 » HTTP Cookie Env Var Test";
 	testCase.description = "Test to check that the server passes the Cookie "
 	                       "request header to the CGI as the HTTP_COOKIE "
 	                       "environment variable — proven by a CGI script that "
@@ -367,7 +367,7 @@ void SessionTests::InvalidSessionNewCookieTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Invalid Session New Cookie Test";
+	testCase.name        = "4 » Invalid Session New Cookie Test";
 	testCase.description = "Test to check that when a client sends a Cookie "
 	                       "header with an unknown/invalid session ID, the server "
 	                       "rejects it and issues a fresh Set-Cookie header for "

@@ -17,9 +17,7 @@ int Socket::inetConnect(const string &host, const string &service, int type)
 	if (service != "")
 		s = (char *)service.c_str();
 
-	if (getaddrinfo(h, s, &hints, &result) != 0)
-	{
-		
+	if (getaddrinfo(h, s, &hints, &result) != 0) {
 		return -1;
 	}
 

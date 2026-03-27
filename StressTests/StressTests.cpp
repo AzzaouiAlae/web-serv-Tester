@@ -126,6 +126,8 @@ bool StressTests::requestWithATestList(const string &host, const string &port,
 	cfg.timeout = timeoutMs;
 	cfg.socket = -1;
 	cfg.socketIO = NULL;
+	cfg.printTest = false; 
+	cfg.isSubTest = true; // Avoids double-printing in actServerResponse
 
 	if (!connectToServer(cfg))
 		return false;
@@ -221,6 +223,7 @@ void StressTests::RapidSequentialRequestsTest()
 	int  successCount = 0;
 	int  firstFailAt  = -1;
 	string lastFailResponse;
+	int progressStep = SEQUENTIAL_COUNT / 100;
 
 	for (int i = 0; i < SEQUENTIAL_COUNT; i++)
 	{
@@ -237,7 +240,11 @@ void StressTests::RapidSequentialRequestsTest()
 				firstFailAt = i + 1;
 			lastFailResponse = response;
 		}
+		if ((i + 1) % progressStep == 0)
+			CLI::printHintProgress("Rapid requests progress: " + to_string(i + 1) + "/" + to_string(SEQUENTIAL_COUNT));
 	}
+	if (SEQUENTIAL_COUNT > 0)
+		std::cerr << std::endl;
 
 	// Build a diagnostic synthetic response for evaluateStressResult
 	string synthetic;
@@ -256,7 +263,7 @@ void StressTests::RapidSequentialRequestsTest()
 	}
 
 	evaluateStressResult(
-		"Rapid Sequential Requests Test",
+		"1 » Rapid Sequential Requests Test",
 		"Test to check that the server correctly handles " +
 		to_string(SEQUENTIAL_COUNT) + " back-to-back GET requests each on a "
 		"new TCP connection — verifying no fd leak and no state corruption "
@@ -354,7 +361,7 @@ void StressTests::ConcurrentConnectionsTest()
 	}
 
 	evaluateStressResult(
-		"Concurrent Connections Test",
+		"2 » Concurrent Connections Test",
 		"Test to check that the server correctly handles " +
 		to_string(CONCURRENT_CLIENTS) + " simultaneous TCP connections — "
 		"verifying epoll multi-fd dispatch and per-connection state isolation.",
@@ -448,7 +455,7 @@ void StressTests::SlowClientTest()
 		            "Response: " + responseOut.substr(0, 80);
 
 	evaluateStressResult(
-		"Slow Client Test",
+		"3 » Slow Client Test",
 		"Test to check that the server buffers partial request data across "
 		"multiple recv() calls and does not close the connection prematurely "
 		"when bytes arrive one at a time with 5 ms delays between them.",
@@ -520,7 +527,7 @@ void StressTests::LargeRequestHeadersTest()
 	}
 
 	evaluateStressResult(
-		"Large Request Headers Test",
+		"4 » Large Request Headers Test",
 		"Test to check server resilience against a request carrying an "
 		"8 KB custom header value — the server must return any valid "
 		"HTTP/1.1 status (200, 400, or 431) and must not crash or hang.",
@@ -609,7 +616,7 @@ void StressTests::ConnectionAfterErrorTest()
 	}
 
 	evaluateStressResult(
-		"Connection After Error Test",
+		"5 » Connection After Error Test",
 		"Test to check that the server remains fully operational after "
 		"sending a 404 error response — a new TCP connection on a valid "
 		"path must immediately return 200 OK with no lingering error state.",
@@ -656,6 +663,7 @@ void StressTests::KeepAliveConnectionEvictionTest()
 	int opened = 0;
 	int openFailures = 0;
 	string openFailureReason;
+	int progressStep = KEEPALIVE_SWARM / 100;
 
 	for (int i = 0; i < KEEPALIVE_SWARM; i++)
 	{
@@ -666,6 +674,7 @@ void StressTests::KeepAliveConnectionEvictionTest()
 		conn->timeout = 2000;
 		conn->socket = -1;
 		conn->socketIO = NULL;
+		conn->printTest = false;
 
 		if (!connectToServer(*conn))
 		{
@@ -709,7 +718,11 @@ void StressTests::KeepAliveConnectionEvictionTest()
 		multiplexer.DeleteFromEpoll(conn->socketIO);
 		testCases.push_back(conn);
 		opened++;
+		if (opened % progressStep == 0)
+			CLI::printHintProgress("Opening keep-alive sockets: " + to_string(opened) + "/" + to_string(KEEPALIVE_SWARM));
 	}
+	if (opened > 0)
+		std::cerr << std::endl;
 	
 	bool extraConnected = false;
 	TestCase extraConn;
@@ -718,18 +731,21 @@ void StressTests::KeepAliveConnectionEvictionTest()
 
 	if (!testCases.empty())
 	{
+		CLI::printHintProgress("Attempting extra connection beyond pool size...");
 		extraConn.host = "127.0.0.1";
 		extraConn.port = "1025";
 		if (connectToServer(extraConn))
 		{
 			extraConnected = true;
 		}
+		std::cerr << std::endl;
 	}
 
 	bool keepAliveSanityOk = false;
 	size_t keepAliveSanityIndex = 0;
 	if (!testCases.empty())
 	{
+		CLI::printHintProgress("Probing keep-alive sanity socket...");
 		// Probe a near-tail socket to verify keep-alive still works on a non-oldest connection.
 		keepAliveSanityIndex = (testCases.size() > 20) ? (testCases.size() - 20) : (testCases.size() - 1);
 		TestCase *probe = testCases[keepAliveSanityIndex];
@@ -745,27 +761,34 @@ void StressTests::KeepAliveConnectionEvictionTest()
 			keepAliveSanityOk = true;
 		}
 		multiplexer.DeleteFromEpoll(probe->socketIO);
+		std::cerr << std::endl;
 	}
 
 	bool oldestClosed = false;
 	if (!testCases.empty())
 	{
+		CLI::printHintProgress("Probing oldest keep-alive socket...");
 		TestCase *oldest = testCases.front();
 		oldest->request = keepAliveRequest;
 		oldest->sendedBytes = 0;
 		oldest->response.clear();
 		oldest->contentLength = (size_t)-1;
 		oldest->headerLength = (size_t)-1;
+		Settings::disablePrint = true; 
 		if (!SendRequestToServer(*oldest))
 		{
 			oldestClosed = true;
 		}
 		else
 		{
+			// Suppress expected failure output if the connection was closed
 			if (!ReadResponseFromServer(*oldest) || oldest->response.empty())
 				oldestClosed = true;
+			
 		}
+		Settings::disablePrint = false;
 		multiplexer.DeleteFromEpoll(oldest->socketIO);
+		std::cerr << std::endl;
 	}
 
 	if (extraConn.socketIO)
@@ -801,7 +824,7 @@ void StressTests::KeepAliveConnectionEvictionTest()
 	}
 
 	evaluateStressResult(
-		"Keep-Alive Connection Eviction Test",
+		"6 » Keep-Alive Connection Eviction Test",
 		"Test to open 10,000 keep-alive sockets and verify whether the server "
 		"starts closing the oldest persistent connection when capacity is under "
 		"extreme pressure.",
@@ -821,10 +844,10 @@ void StressTests::KeepAliveConnectionEvictionTest()
 // ─────────────────────────────────────────────────────────────────────────────
 void StressTests::AddAllTests()
 {
-	_testFunctions.push_back( make_pair("Rapid Sequential Requests Test", (void (ATestList::*)())&StressTests::RapidSequentialRequestsTest) );
-	_testFunctions.push_back( make_pair("Concurrent Connections Test",    (void (ATestList::*)())&StressTests::ConcurrentConnectionsTest) );
-	_testFunctions.push_back( make_pair("Slow Client Test",               (void (ATestList::*)())&StressTests::SlowClientTest) );
-	_testFunctions.push_back( make_pair("Large Request Headers Test",     (void (ATestList::*)())&StressTests::LargeRequestHeadersTest) );
-	_testFunctions.push_back( make_pair("Connection After Error Test",    (void (ATestList::*)())&StressTests::ConnectionAfterErrorTest) );
-	_testFunctions.push_back( make_pair("Keep-Alive Connection Eviction Test", (void (ATestList::*)())&StressTests::KeepAliveConnectionEvictionTest) );
+	_testFunctions.push_back( make_pair("1 » Rapid Sequential Requests Test", (void (ATestList::*)())&StressTests::RapidSequentialRequestsTest) );
+	_testFunctions.push_back( make_pair("2 » Concurrent Connections Test",    (void (ATestList::*)())&StressTests::ConcurrentConnectionsTest) );
+	_testFunctions.push_back( make_pair("3 » Slow Client Test",               (void (ATestList::*)())&StressTests::SlowClientTest) );
+	_testFunctions.push_back( make_pair("4 » Large Request Headers Test",     (void (ATestList::*)())&StressTests::LargeRequestHeadersTest) );
+	_testFunctions.push_back( make_pair("5 » Connection After Error Test",    (void (ATestList::*)())&StressTests::ConnectionAfterErrorTest) );
+	_testFunctions.push_back( make_pair("6 » Keep-Alive Connection Eviction Test", (void (ATestList::*)())&StressTests::KeepAliveConnectionEvictionTest) );
 }

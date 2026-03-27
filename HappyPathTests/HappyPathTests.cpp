@@ -13,7 +13,7 @@ void HappyPathTests::GetIndexTest()
 {
 	// arange
 	TestCase testCase;
-	testCase.name = "Get Index Test";
+	testCase.name = "1 » Get Index Test";
 	testCase.description = "Test to check if the server returns the correct index page";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -29,7 +29,7 @@ void HappyPathTests::GetStaticHtmlTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Static Html Test";
+	testCase.name = "2 » Get Static Html Test";
 	testCase.description = "Test to check if the server returns a specific static HTML file directly";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -46,7 +46,7 @@ void HappyPathTests::GetBinaryFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Binary File Test";
+	testCase.name = "3 » Get Binary File Test";
 	testCase.description = "Test to check if the server can serve binary files (like images/icons) without null-byte string truncation.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -64,7 +64,7 @@ void HappyPathTests::GetDirectoryWithTrailingSlashTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Directory With Trailing Slash Test";
+	testCase.name = "4 » Get Directory With Trailing Slash Test";
 	testCase.description = "Test to check if the server correctly handles requests for a directory with a trailing slash.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -92,6 +92,7 @@ void HappyPathTests::HeadRequestTest()
 	getCase.expectedResponse.push_back("HTTP/1.1 200 OK");
 	getCase.timeout = 2000;
 	getCase.printTest = false; // Don't print this GET test in the summary
+	getCase.isSubTest = true; // Mark as sub-test to exclude from pass/fail count
 
 	RunTestCase(getCase);
 
@@ -129,7 +130,7 @@ void HappyPathTests::HeadRequestTest()
 
 	// Step 2: Test HEAD request - should return identical headers (except Date/Set-Cookie) but no body
 	TestCase testCase;
-	testCase.name = "Head Request Test";
+	testCase.name = "5 » Head Request Test";
 	testCase.description = "Test to check if the server correctly handles a HEAD request by returning the same headers as GET but without a response body (excluding dynamic headers like Date and Set-Cookie).";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -154,7 +155,7 @@ void HappyPathTests::PostSimpleTextTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Post Simple Text Test";
+	testCase.name = "6 » Post Simple Text Test";
 	testCase.description = "Test to check if the server correctly handles a POST request with a plain text body.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -183,7 +184,7 @@ void HappyPathTests::DeleteExistingFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Delete Existing File Test";
+	testCase.name = "7 » Delete Existing File Test";
 	testCase.description = "Test to check if the server correctly handles a DELETE request and removes an existing resource.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -206,7 +207,7 @@ void HappyPathTests::GetCssFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Css File Test";
+	testCase.name = "8 » Get Css File Test";
 	testCase.description = "Test to check if the server serves a CSS file with the correct Content-Type header.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -228,7 +229,7 @@ void HappyPathTests::GetImageFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Image File Test";
+	testCase.name = "9 » Get Image File Test";
 	testCase.description = "Test to check if the server serves a PNG image with the correct Content-Type header.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -250,7 +251,7 @@ void HappyPathTests::GetLargeHtmlTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Large Html Test";
+	testCase.name = "10 » Get Large Html Test";
 	testCase.description = "Test to check if the server can correctly serve a large HTML file, validating that the response is fully buffered and sent across multiple write() calls if needed.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -272,7 +273,7 @@ void HappyPathTests::PostUploadBinaryFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Post Upload Binary File Test";
+	testCase.name = "11 » Post Upload Binary File Test";
 	testCase.description = "Test to check if the server correctly handles a POST request uploading a binary file (simulated PNG header bytes) as multipart form data, and verify the file is saved correctly.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -308,6 +309,7 @@ void HappyPathTests::PostUploadBinaryFileTest()
 	testCase.timeout = 2000;
 
 	testCase.printTest = false;
+	testCase.isSubTest = true; // Mark as sub-test to exclude from pass/fail count
 
 	RunTestCase(testCase);
 
@@ -330,7 +332,7 @@ void HappyPathTests::PostOnRootTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Post On Root Test";
+	testCase.name = "12 » Post On Root Test";
 	testCase.description = "Test to check if the server correctly handles a POST request sent to the root path.";
 
 	testCase.port = "1025";
@@ -373,7 +375,7 @@ void HappyPathTests::DeleteBinaryFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Delete Binary File Test";
+	testCase.name = "13 » Delete Binary File Test";
 	testCase.description = "Test to check if the server correctly handles a DELETE request and removes an existing resource.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
@@ -396,7 +398,7 @@ void HappyPathTests::GetAlternatePortTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name = "Get Alternate Port Test";
+	testCase.name = "14 » Get Alternate Port Test";
 	testCase.description = "Test to check if the server is correctly listening and serving responses on a secondary configured port.";
 	testCase.port = "1026";
 	testCase.host = "localhost";

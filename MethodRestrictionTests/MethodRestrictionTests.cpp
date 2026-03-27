@@ -41,7 +41,7 @@ void MethodRestrictionTests::PostToGetOnlyRouteTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Post To Get Only Route Test";
+	testCase.name        = "1 » Post To Get Only Route Test";
 	testCase.description = "Test to check that the server returns 405 Method Not "
 	                       "Allowed when POST is sent to a route whose config "
 	                       "only permits GET.";
@@ -83,7 +83,7 @@ void MethodRestrictionTests::DeleteToGetOnlyRouteTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Delete To Get Only Route Test";
+	testCase.name        = "2 » Delete To Get Only Route Test";
 	testCase.description = "Test to check that the server returns 405 Method Not "
 	                       "Allowed when DELETE is sent to a route whose config "
 	                       "only permits GET.";
@@ -119,7 +119,7 @@ void MethodRestrictionTests::GetToPostOnlyRouteTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Get To Post Only Route Test";
+	testCase.name        = "3 » Get To Post Only Route Test";
 	testCase.description = "Test to check that the server returns 405 Method Not "
 	                       "Allowed when GET is sent to a route whose config "
 	                       "only permits POST.";
@@ -154,7 +154,7 @@ void MethodRestrictionTests::DeleteToPostOnlyRouteTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Delete To Post Only Route Test";
+	testCase.name        = "4 » Delete To Post Only Route Test";
 	testCase.description = "Test to check that the server returns 405 Method Not "
 	                       "Allowed when DELETE is sent to a route whose config "
 	                       "only permits POST.";
@@ -194,7 +194,7 @@ void MethodRestrictionTests::AllowHeaderPresentOn405Test()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Allow Header Present On 405 Test";
+	testCase.name        = "5 » Allow Header Present On 405 Test";
 	testCase.description = "Test to check that a 405 response contains the "
 	                       "mandatory 'Allow:' header listing the methods the "
 	                       "route actually supports (RFC 7231 §6.5.5).";

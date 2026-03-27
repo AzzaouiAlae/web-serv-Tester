@@ -3,7 +3,6 @@
 
 MinimumEvaluationTests::MinimumEvaluationTests() : ATestList("Minimum Evaluation Tests")
 {
-
     AddAllTests();
 }
 
@@ -65,7 +64,7 @@ void MinimumEvaluationTests::AddAllTests()
 void MinimumEvaluationTests::SimpleGet()
 {
     TestCase config;
-    config.name = "Simple GET";
+    config.name = "1 » Simple GET";
     config.description = "Test simple GET request to root - should return 200";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -85,7 +84,7 @@ void MinimumEvaluationTests::SimpleGet()
 void MinimumEvaluationTests::PostRootReturn405()
 {
     TestCase config;
-    config.name = "POST to root returns 405";
+    config.name = "2 » POST to root returns 405";
     config.description = "Test POST request to root - should return 405 Method Not Allowed";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -109,7 +108,7 @@ void MinimumEvaluationTests::PostRootReturn405()
 void MinimumEvaluationTests::HeadRootReturn405()
 {
     TestCase config;
-    config.name = "HEAD to root returns 405";
+    config.name = "3 » HEAD to root returns 405";
     config.description = "Test HEAD request to root - should return 405 Method Not Allowed";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -130,7 +129,7 @@ void MinimumEvaluationTests::HeadRootReturn405()
 void MinimumEvaluationTests::DirectoryRedirectTo301()
 {
     TestCase config;
-    config.name = "Directory redirect returns 301";
+    config.name = "4 » Directory redirect returns 301";
     config.description = "Test GET request to /directory without trailing slash - should redirect to /directory/";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -150,7 +149,7 @@ void MinimumEvaluationTests::DirectoryRedirectTo301()
 void MinimumEvaluationTests::DirectoryGetBadExtension()
 {
     TestCase config;
-    config.name = "Directory GET with bad extension index";
+    config.name = "5 » Directory GET with bad extension index";
     config.description = "Test GET request to /directory/ - should return index youpi.bad_extension";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -171,7 +170,7 @@ void MinimumEvaluationTests::DirectoryGetBadExtension()
 void MinimumEvaluationTests::DirectoryGetFileBadExtension()
 {
     TestCase config;
-    config.name = "Directory GET file with bad extension";
+    config.name = "6 » Directory GET file with bad extension";
     config.description = "Test GET request to /directory/youpi.bad_extension - should return 200";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -191,7 +190,7 @@ void MinimumEvaluationTests::DirectoryGetFileBadExtension()
 void MinimumEvaluationTests::DirectoryGetFileBlaBla()
 {
     TestCase config;
-    config.name = "Directory GET file with bla extension";
+    config.name = "7 » Directory GET file with bla extension";
     config.description = "Test GET request to /directory/youpi.bla - should not execute CGI and return 200";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -211,7 +210,7 @@ void MinimumEvaluationTests::DirectoryGetFileBlaBla()
 void MinimumEvaluationTests::DirectoryGetNonExistent()
 {
     TestCase config;
-    config.name = "Directory GET non-existent file";
+    config.name = "8 » Directory GET non-existent file";
     config.description = "Test GET request to /directory/oulalala - should return 404";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -233,7 +232,7 @@ void MinimumEvaluationTests::DirectoryGetNonExistent()
 void MinimumEvaluationTests::NopDirectoryReturn301()
 {
     TestCase config;
-    config.name = "Nop directory returns 301";
+    config.name = "9 » Nop directory returns 301";
     config.description = "Test GET request to /directory/nop without trailing slash - should redirect to /directory/nop/";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -253,7 +252,7 @@ void MinimumEvaluationTests::NopDirectoryReturn301()
 void MinimumEvaluationTests::NopDirectoryWithReferer()
 {
     TestCase config;
-    config.name = "Nop directory with referer returns autoindex";
+    config.name = "10 » Nop directory with referer returns autoindex";
     config.description = "Test GET request to /directory/nop/ with referer header - should return 200 with autoindex";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -274,7 +273,7 @@ void MinimumEvaluationTests::NopDirectoryWithReferer()
 void MinimumEvaluationTests::NopDirectoryAutoindex()
 {
     TestCase config;
-    config.name = "Nop directory autoindex enabled returns 200";
+    config.name = "11 » Nop directory autoindex enabled returns 200";
     config.description = "Test GET request to /directory/nop/ without referer - should return 200 with autoindex";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -294,7 +293,7 @@ void MinimumEvaluationTests::NopDirectoryAutoindex()
 void MinimumEvaluationTests::NopDirectoryGetFile()
 {
     TestCase config;
-    config.name = "Nop directory GET file returns 200";
+    config.name = "12 » Nop directory GET file returns 200";
     config.description = "Test GET request to /directory/nop/other.pouic - should return 200";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -314,7 +313,7 @@ void MinimumEvaluationTests::NopDirectoryGetFile()
 void MinimumEvaluationTests::NopDirectoryGetOtherFile()
 {
     TestCase config;
-    config.name = "Nop directory GET other file returns 404";
+    config.name = "13 » Nop directory GET other file returns 404";
     config.description = "Test GET request to /directory/nop/other.pouac - should return 404";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -336,7 +335,7 @@ void MinimumEvaluationTests::NopDirectoryGetOtherFile()
 void MinimumEvaluationTests::YeahDirectoryReturn404()
 {
     TestCase config;
-    config.name = "Yeah directory returns 404";
+    config.name = "14 » Yeah directory returns 404";
     config.description = "Test GET request to /directory/Yeah without file - should return 404 due to different roots";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -356,7 +355,7 @@ void MinimumEvaluationTests::YeahDirectoryReturn404()
 void MinimumEvaluationTests::YeahNotHappyReturn200()
 {
     TestCase config;
-    config.name = "Yeah not happy returns 200";
+    config.name = "15 » Yeah not happy returns 200";
     config.description = "Test GET request to /directory/Yeah/not_happy.bad_extension - should return 200";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -378,7 +377,7 @@ void MinimumEvaluationTests::YeahNotHappyReturn200()
 void MinimumEvaluationTests::ChunkedLarge100MYChars()
 {
     TestCase config;
-    config.name = "Chunked large 100M chars body with y";
+    config.name = "16 » Chunked large 100M chars body with y";
     config.description = "Test POST request with chunked transfer encoding sending 100M 'y' characters";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -402,7 +401,7 @@ void MinimumEvaluationTests::ChunkedLarge100MYChars()
 void MinimumEvaluationTests::ChunkedLarge100MEChars()
 {
     TestCase config;
-    config.name = "Chunked large 100M chars body with e";
+    config.name = "17 » Chunked large 100M chars body with e";
     config.description = "Test POST request with chunked transfer encoding sending 100M 'e' characters";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -426,7 +425,7 @@ void MinimumEvaluationTests::ChunkedLarge100MEChars()
 void MinimumEvaluationTests::Chunked100KEChars()
 {
     TestCase config;
-    config.name = "Chunked 100K chars body";
+    config.name = "18 » Chunked 100K chars body";
     config.description = "Test POST request with chunked transfer encoding sending 100K 'e' characters";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -453,7 +452,7 @@ void MinimumEvaluationTests::Chunked100KEChars()
 void MinimumEvaluationTests::PostBodyEmpty()
 {
     TestCase config;
-    config.name = "POST /post_body with empty body";
+    config.name = "19 » POST /post_body with empty body";
     config.description = "Test POST request to /post_body with empty body - should return 200 (within 100-byte limit)";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -474,7 +473,7 @@ void MinimumEvaluationTests::PostBodyEmpty()
 void MinimumEvaluationTests::PostBody100PChars()
 {
     TestCase config;
-    config.name = "POST /post_body with 100 bytes";
+    config.name = "20 » POST /post_body with 100 bytes";
     config.description = "Test POST request to /post_body with exactly 100 bytes - should return 200 (at limit)";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -498,7 +497,7 @@ void MinimumEvaluationTests::PostBody100PChars()
 void MinimumEvaluationTests::PostBody200WChars()
 {
     TestCase config;
-    config.name = "POST /post_body with 200 bytes";
+    config.name = "21 » POST /post_body with 200 bytes";
     config.description = "Test POST request to /post_body with 200 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -523,7 +522,7 @@ void MinimumEvaluationTests::PostBody200WChars()
 void MinimumEvaluationTests::PostBody101QCharsExceedsLimit()
 {
     TestCase config;
-    config.name = "POST /post_body with 101 bytes exceeds limit";
+    config.name = "22 » POST /post_body with 101 bytes exceeds limit";
     config.description = "Test POST request to /post_body with 101 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -549,7 +548,7 @@ void MinimumEvaluationTests::PostBody101QCharsExceedsLimit()
 void MinimumEvaluationTests::ChunkedPostBodyEmpty()
 {
     TestCase config;
-    config.name = "Chunked POST /post_body with empty body";
+    config.name = "23 » Chunked POST /post_body with empty body";
     config.description = "Test POST request to /post_body with chunked empty body - should return 200 (within 100-byte limit)";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -572,7 +571,7 @@ void MinimumEvaluationTests::ChunkedPostBodyEmpty()
 void MinimumEvaluationTests::ChunkedPostBody100PChars()
 {
     TestCase config;
-    config.name = "Chunked POST /post_body with 100 bytes";
+    config.name = "24 » Chunked POST /post_body with 100 bytes";
     config.description = "Test POST request to /post_body with chunked body of exactly 100 bytes - should return 200 (at limit)";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -597,7 +596,7 @@ void MinimumEvaluationTests::ChunkedPostBody100PChars()
 void MinimumEvaluationTests::ChunkedPostBody200WChars()
 {
     TestCase config;
-    config.name = "Chunked POST /post_body with 200 bytes";
+    config.name = "25 » Chunked POST /post_body with 200 bytes";
     config.description = "Test POST request to /post_body with chunked body of 200 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -622,7 +621,7 @@ void MinimumEvaluationTests::ChunkedPostBody200WChars()
 void MinimumEvaluationTests::ChunkedPostBody101QCharsExceedsLimit()
 {
     TestCase config;
-    config.name = "Chunked POST /post_body with 101 bytes exceeds limit";
+    config.name = "26 » Chunked POST /post_body with 101 bytes exceeds limit";
     config.description = "Test POST request to /post_body with chunked body of 101 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -654,7 +653,7 @@ void MinimumEvaluationTests::StressFork5Requests20()
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Connection: close\r\n"
                      "\r\n";
-    config.name = "Stress fork 5 requests 20";
+    config.name = "27 » Stress fork 5 requests 20";
     config.description = "Stress test: 5 forks × 20 requests = 100 sequential GET requests";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -678,7 +677,7 @@ void MinimumEvaluationTests::StressFork20Requests5000()
                      "Host: 127.0.0.1:1025\r\n"
                      "Connection: close\r\n"
                      "\r\n";
-    config.name = "Stress fork 20 requests 5000";
+    config.name = "28 » Stress fork 20 requests 5000";
     config.description = "Stress test: 20 forks × 5000 requests = 100,000 sequential GET requests";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -702,7 +701,7 @@ void MinimumEvaluationTests::StressFork128Requests50()
                      "Host: 127.0.0.1:1025\r\n"
                      "Connection: close\r\n"
                      "\r\n";
-    config.name = "Stress fork 128 requests 50";
+    config.name = "29 » Stress fork 128 requests 50";
     config.description = "Stress test: 128 forks × 50 requests = 6,400 GET requests to /directory/nop (redirect)";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -729,7 +728,7 @@ void MinimumEvaluationTests::StressLargePOSTFork20()
                      "Content-Type: text/plain\r\n"
                      "Connection: close\r\n"
                      "\r\n" + body;
-    config.name = "Stress large POST fork 20";
+    config.name = "30 » Stress large POST fork 20";
     config.description = "Stress test: 20 forks × 1 large POST request with 10KB body";
     config.host = "127.0.0.1";
     config.port = "1025";
@@ -749,7 +748,7 @@ void MinimumEvaluationTests::StressLargePOSTFork20()
 void MinimumEvaluationTests::ChunkedForkLarge100MKChars()
 {
     TestCase config;
-    config.name = "Chunked fork large 100M chars with k";
+    config.name = "31 » Chunked fork large 100M chars with k";
     config.description = "Stress test: 20 forks × 5 requests with 100M 'k' characters each";
     config.host = "127.0.0.1";
     config.port = "1025";

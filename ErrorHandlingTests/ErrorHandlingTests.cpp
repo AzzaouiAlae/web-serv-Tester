@@ -20,7 +20,7 @@ void ErrorHandlingTests::GetNonExistentFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Get Non Existent File Test";
+	testCase.name        = "1 » Get Non Existent File Test";
 	testCase.description = "Test to check if the server returns 404 Not Found "
 	                       "when a requested file does not exist on the server.";
 	testCase.port        = "1025";
@@ -56,7 +56,7 @@ void ErrorHandlingTests::GetForbiddenFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Get Forbidden File Test";
+	testCase.name        = "2 » Get Forbidden File Test";
 	testCase.description = "Test to check if the server returns 403 Forbidden "
 	                       "when the requested file exists but is not readable "
 	                       "due to file system permissions.";
@@ -93,7 +93,7 @@ void ErrorHandlingTests::MalformedRequestLineTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Malformed Request Line Test";
+	testCase.name        = "3 » Malformed Request Line Test";
 	testCase.description = "Test to check if the server returns 400 Bad Request "
 	                       "when the incoming request line is syntactically invalid "
 	                       "(missing HTTP version token).";
@@ -129,7 +129,7 @@ void ErrorHandlingTests::UnsupportedMethodTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Unsupported Method Test";
+	testCase.name        = "4 » Unsupported Method Test";
 	testCase.description = "Test to check if the server returns 501 Not Implemented "
 	                       "when it receives an HTTP method it does not support "
 	                       "(e.g. PATCH).";
@@ -164,7 +164,7 @@ void ErrorHandlingTests::HttpVersionMismatchTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Http Version Mismatch Test";
+	testCase.name        = "5 » Http Version Mismatch Test";
 	testCase.description = "Test to check if the server returns 505 HTTP Version "
 	                       "Not Supported when the client announces HTTP/2.0 in "
 	                       "the request line.";
@@ -200,7 +200,7 @@ void ErrorHandlingTests::MissingHostHeaderTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Missing Host Header Test";
+	testCase.name        = "6 » Missing Host Header Test";
 	testCase.description = "Test to check if the server returns 400 Bad Request "
 	                       "when an HTTP/1.1 request arrives with no Host header, "
 	                       "which is mandatory per RFC 7230.";

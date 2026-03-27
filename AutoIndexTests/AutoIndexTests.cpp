@@ -61,7 +61,7 @@ void AutoIndexTests::AutoIndexEnabledTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Auto Index Enabled Test";
+	testCase.name        = "1 » Auto Index Enabled Test";
 	testCase.description = "Test to check that the server returns 200 OK and "
 	                       "generates a directory listing when autoindex is on "
 	                       "and no default index file exists in the directory.";
@@ -104,7 +104,7 @@ void AutoIndexTests::AutoIndexDisabledTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Auto Index Disabled Test";
+	testCase.name        = "2 » Auto Index Disabled Test";
 	testCase.description = "Test to check that the server returns 403 Forbidden "
 	                       "when autoindex is off and no default index file "
 	                       "exists — the directory must not be listed.";
@@ -153,7 +153,7 @@ void AutoIndexTests::AutoIndexShowsFilesTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Auto Index Shows Files Test";
+	testCase.name        = "3 » Auto Index Shows Files Test";
 	testCase.description = "Test to check that the autoindex-generated HTML "
 	                       "body contains the name of a file that is known to "
 	                       "exist inside the listed directory.";
@@ -202,7 +202,7 @@ void AutoIndexTests::AutoIndexContentTypeTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Auto Index Content Type Test";
+	testCase.name        = "4 » Auto Index Content Type Test";
 	testCase.description = "Test to check that the autoindex-generated directory "
 	                       "listing response includes a 'Content-Type: text/html' "
 	                       "header — confirming the server treats the listing as "
@@ -251,7 +251,7 @@ void AutoIndexTests::AutoIndexWithIndexFileTest()
 {
 	// arrange
 	TestCase testCase;
-	testCase.name        = "Auto Index With Index File Test";
+	testCase.name        = "5 » Auto Index With Index File Test";
 	testCase.description = "Test to check that when autoindex is on AND a default "
 	                       "index file exists, the server serves the index file "
 	                       "and does NOT generate a directory listing — the index "
