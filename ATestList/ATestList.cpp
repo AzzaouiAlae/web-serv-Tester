@@ -1761,7 +1761,6 @@ void ATestList::RunStreamingTestCase(TestCase &config)
 							if (responseState.responseComplete)
 							{
 								done = true;
-								cout << "Here 2";
 								break;
 							}
 							continue;
