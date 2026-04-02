@@ -35,8 +35,9 @@ void MinimumEvaluationTests::AddAllTests()
     _testFunctions.push_back(make_pair("GET /directory/Yeah (404)", (void (ATestList::*)())&MinimumEvaluationTests::YeahDirectoryReturn404));
     _testFunctions.push_back(make_pair("GET /directory/Yeah/not_happy.bad_extension", (void (ATestList::*)())&MinimumEvaluationTests::YeahNotHappyReturn200));
 
-    // Tests 16-18: Chunked transfer encoding tests (100M chars)
+    // Tests 16-19: Large body streaming tests (chunked + Content-Length)
     _testFunctions.push_back(make_pair("POST 100M 'y' chars chunked", (void (ATestList::*)())&MinimumEvaluationTests::ChunkedLarge100MYChars));
+    _testFunctions.push_back(make_pair("POST 100M 'y' chars Content-Length", (void (ATestList::*)())&MinimumEvaluationTests::ContentLengthLarge100MYChars));
     _testFunctions.push_back(make_pair("POST 100M 'e' chars chunked", (void (ATestList::*)())&MinimumEvaluationTests::ChunkedLarge100MEChars));
     _testFunctions.push_back(make_pair("POST 100K 'e' chars chunked with header", (void (ATestList::*)())&MinimumEvaluationTests::Chunked100KEChars));
 
@@ -395,7 +396,31 @@ void MinimumEvaluationTests::ChunkedLarge100MYChars()
     config.sleepTime = 10000;
     config.maxSend = 32768;
     config.configurationsForTestCase = "POST /directory/youpi.bla with 100M 'y' chars in chunked transfer should return 200 OK or 201 Created.\nBody generated on-the-fly to minimize memory usage.";
-    RunTestCase(config);
+    RunStreamingTestCase(config);
+}
+
+void MinimumEvaluationTests::ContentLengthLarge100MYChars()
+{
+    TestCase config;
+    config.name = "16b » Content-Length large 100M chars body with y";
+    config.description = "Test POST request with Content-Length sending 100M 'y' characters without chunked transfer";
+    config.host = "127.0.0.1";
+    config.port = "1025";
+    config.request = "POST /directory/youpi.bla HTTP/1.1\r\n"
+                     "Host: 127.0.0.1:1025\r\n"
+                     "User-Agent: Go-http-client/1.1\r\n"
+                     "Content-Length: 100000000\r\n"
+                     "Content-Type: test/file\r\n"
+                     "Accept-Encoding: gzip\r\n"
+                     "\r\n";
+    config.body = "'y' repeated 100000000 times";
+    config.expectedResponse.push_back("200 OK||201 Created");
+    config.expectedResponse.push_back("'Y' repeated 100000000 times");
+    config.timeout = 60000;
+    config.sleepTime = 10000;
+    config.maxSend = 32768;
+    config.configurationsForTestCase = "POST /directory/youpi.bla with 100M 'y' chars and Content-Length should return 200 OK or 201 Created.\nBody is generated progressively in small segments to avoid allocating a 100M buffer.";
+    RunStreamingTestCase(config);
 }
 
 void MinimumEvaluationTests::ChunkedLarge100MEChars()
@@ -419,7 +444,7 @@ void MinimumEvaluationTests::ChunkedLarge100MEChars()
     config.sleepTime = 10000;
     config.maxSend = 32768;
     config.configurationsForTestCase = "POST /directory/youpla.bla with 100M 'e' chars in chunked transfer should return 200 OK or 201 Created.\nBody generated on-the-fly to minimize memory usage.";
-    RunTestCase(config);
+    RunStreamingTestCase(config);
 }
 
 void MinimumEvaluationTests::Chunked100KEChars()
@@ -444,7 +469,7 @@ void MinimumEvaluationTests::Chunked100KEChars()
     config.sleepTime = 10000;
     config.maxSend = 32768;
     config.configurationsForTestCase = "POST /directory/youpi.bla with 100K 'e' chars in chunked transfer should return 200 OK or 201 Created.\nBody generated on-the-fly to minimize memory usage.";
-    RunTestCase(config);
+    RunStreamingTestCase(config);
 }
 
 // ========================= Client body size limit tests =========================
@@ -770,6 +795,6 @@ void MinimumEvaluationTests::ChunkedForkLarge100MKChars()
     config.forkCount = 20;
     config.totalRequests = 5;
     config.childResults.resize(config.forkCount, 0);
-    // RunTestCase(config);
+    // RunStreamingTestCase(config);
     RunForkChildTestCase(config);
 }

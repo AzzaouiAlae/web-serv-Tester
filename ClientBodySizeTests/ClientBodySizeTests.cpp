@@ -8,7 +8,7 @@
 // To use a different limit, change the BODY_LIMIT constant below and update
 // your server config to match.
 // ─────────────────────────────────────────────────────────────────────────────
-static const size_t BODY_LIMIT = 1024;
+static const size_t BODY_LIMIT = 2048;
 
 ClientBodySizeTests::ClientBodySizeTests() : ATestList("Client Body Size Tests")
 {

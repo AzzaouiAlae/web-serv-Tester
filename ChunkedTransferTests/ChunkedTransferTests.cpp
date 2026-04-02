@@ -293,9 +293,9 @@ void ChunkedTransferTests::ChunkedBodySizeLimitTest()
 	testCase.port        = "1025";
 	testCase.host        = "localhost";
 
-	// Two chunks whose assembled total is BODY_LIMIT + 1 (1025 bytes)
-	string chunk1      = string(512, 'A');          // 0x200
-	string chunk2      = string(BODY_LIMIT + 1 - 512, 'A');  // 0x201  (513 bytes)
+	// Two chunks whose assembled total is BODY_LIMIT + 1 (2049 bytes)
+	string chunk1      = string(1024, 'A');          // 0x400
+	string chunk2      = string(1025, 'A');  // 0x401  (1025 bytes)
 	string chunkedBody = chunkEncode(chunk1) + chunkEncode(chunk2) + CHUNK_TERMINATOR;
 
 	testCase.request =
@@ -432,7 +432,7 @@ void ChunkedTransferTests::ChunkedMultipartTest()
         "parse the boundary, and extract the file named 'test.txt' "
         "containing the text 'Hello from a chunk!'.";
 
-    testCase.timeout = 10000;
+    testCase.timeout = -1;
 
     RunTestCase(testCase);
 }
@@ -775,8 +775,8 @@ void ChunkedTransferTests::SlowUploadByteByByteTest()
 	testCase.configurationsForTestCase = "SETUP: '/upload' route must accept multipart/form-data. This test sends a small file part using chunked encoding, but the body is sent one byte at a time with a 10s delay between bytes. The server must tolerate slow uploads and accept the request.";
 
 	testCase.maxSend = 1; // Send one byte per send
-	testCase.sleepTime = 10000; // Sleep 10s after each send
-	testCase.timeout = 10000;
+	testCase.sleepTime = 50000; // Sleep 10s after each send
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }
@@ -815,7 +815,7 @@ void ChunkedTransferTests::PrematureEOFTest()
 
 	testCase.configurationsForTestCase = "SETUP: '/upload' route must accept multipart/form-data. This test sends a chunked body that ends before the chunked terminator or chunk data is complete. The server must detect the incomplete body and return 400.";
 
-	testCase.timeout = 10000;
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }

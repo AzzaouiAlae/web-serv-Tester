@@ -1,42 +1,43 @@
 #include "ATestList.hpp"
+#include <cerrno>
 
 // Decompress chunked-encoded body
-static bool decodeChunkedBodyForDisplay(const string &chunkedBody, string &decodedBody)
-{
-	decodedBody.clear();
-	size_t cursor = 0;
+// static bool decodeChunkedBodyForDisplay(const string &chunkedBody, string &decodedBody)
+// {
+// 	decodedBody.clear();
+// 	size_t cursor = 0;
 
-	while (true)
-	{
-		size_t sizeLineEnd = chunkedBody.find("\r\n", cursor);
-		if (sizeLineEnd == string::npos)
-			return false;
+// 	while (true)
+// 	{
+// 		size_t sizeLineEnd = chunkedBody.find("\r\n", cursor);
+// 		if (sizeLineEnd == string::npos)
+// 			return false;
 
-		string sizeLine = chunkedBody.substr(cursor, sizeLineEnd - cursor);
-		size_t extensionPos = sizeLine.find(';');
-		if (extensionPos != string::npos)
-			sizeLine = sizeLine.substr(0, extensionPos);
-		if (sizeLine.empty())
-			return false;
+// 		string sizeLine = chunkedBody.substr(cursor, sizeLineEnd - cursor);
+// 		size_t extensionPos = sizeLine.find(';');
+// 		if (extensionPos != string::npos)
+// 			sizeLine = sizeLine.substr(0, extensionPos);
+// 		if (sizeLine.empty())
+// 			return false;
 
-		char *endPtr = NULL;
-		unsigned long chunkSize = strtoul(sizeLine.c_str(), &endPtr, 16);
-		if (endPtr == NULL || *endPtr != '\0')
-			return false;
+// 		char *endPtr = NULL;
+// 		unsigned long chunkSize = strtoul(sizeLine.c_str(), &endPtr, 16);
+// 		if (endPtr == NULL || *endPtr != '\0')
+// 			return false;
 
-		cursor = sizeLineEnd + 2;
-		if (chunkSize == 0)
-			return true;
+// 		cursor = sizeLineEnd + 2;
+// 		if (chunkSize == 0)
+// 			return true;
 
-		if (cursor + chunkSize + 2 > chunkedBody.size())
-			return false;
-		decodedBody.append(chunkedBody, cursor, chunkSize);
-		cursor += chunkSize;
-		if (chunkedBody.compare(cursor, 2, "\r\n") != 0)
-			return false;
-		cursor += 2;
-	}
-}
+// 		if (cursor + chunkSize + 2 > chunkedBody.size())
+// 			return false;
+// 		decodedBody.append(chunkedBody, cursor, chunkSize);
+// 		cursor += chunkSize;
+// 		if (chunkedBody.compare(cursor, 2, "\r\n") != 0)
+// 			return false;
+// 		cursor += 2;
+// 	}
+// }
 
 // Compress repeated characters for display (e.g., "YYYY..." becomes "Y repeated 1000000000 times")
 static string compressRepeatedCharsForDisplay(const string &body, size_t maxDisplayLength = 100)
@@ -146,6 +147,678 @@ namespace
 		body = message.substr(headerEnd + 4);
 	}
 
+	enum StreamingChunkParseState
+	{
+		STREAM_CHUNK_READ_SIZE,
+		STREAM_CHUNK_READ_DATA,
+		STREAM_CHUNK_EXPECT_DATA_CR,
+		STREAM_CHUNK_EXPECT_DATA_LF,
+		STREAM_CHUNK_READ_TRAILERS,
+		STREAM_CHUNK_DONE
+	};
+
+	struct StreamingResponseState
+	{
+		string headerBuffer;
+		bool headerComplete;
+		vector<string> headerExpectedPatterns;
+		bool bodyPatternEnabled;
+		char bodyExpectedChar;
+		size_t bodyExpectedCount;
+		size_t bodyCount;
+		bool chunkedResponse;
+		bool hasContentLength;
+		size_t contentLength;
+		size_t decodedBodyBytes;
+		bool responseComplete;
+		StreamingChunkParseState chunkState;
+		string chunkLineBuffer;
+		size_t chunkBytesRemaining;
+		string trailerBuffer;
+
+		StreamingResponseState() : headerComplete(false), bodyPatternEnabled(false), bodyExpectedChar('\0'),
+								 bodyExpectedCount(0), bodyCount(0), chunkedResponse(false), hasContentLength(false),
+								 contentLength(0), decodedBodyBytes(0), responseComplete(false),
+								 chunkState(STREAM_CHUNK_READ_SIZE), chunkBytesRemaining(0)
+		{
+		}
+	};
+
+	struct StreamingSendState
+	{
+		size_t headerSize;
+		size_t headerSentBytes;
+		bool headerSendComplete;
+		bool hasGeneratedBody;
+		bool requestSendComplete;
+		bool writeShutdownSent;
+		string bodySegment;
+		size_t totalSendSize;
+		size_t payloadBytesPlanned;
+
+		StreamingSendState() : headerSize(0), headerSentBytes(0), headerSendComplete(false),
+						   hasGeneratedBody(false), requestSendComplete(false),
+						   writeShutdownSent(false), totalSendSize(0), payloadBytesPlanned(0)
+		{
+		}
+	};
+
+	static bool isWouldBlockError()
+	{
+		return errno == EAGAIN || errno == EWOULDBLOCK;
+	}
+
+	static bool setSocketNonBlocking(int fd)
+	{
+		int flags = fcntl(fd, F_GETFL, 0);
+		if (flags == -1)
+			return false;
+		if ((flags & O_NONBLOCK) != 0)
+			return true;
+		return fcntl(fd, F_SETFL, flags | O_NONBLOCK) != -1;
+	}
+
+	static bool sendSocketData(SocketIO *socketIO, const char *buffer, size_t length, int &sentBytes)
+	{
+		sentBytes = socketIO->Send((void *)buffer, length);
+		if (sentBytes == -1 && isWouldBlockError())
+		{
+			sentBytes = 0;
+			return true;
+		}
+		return sentBytes >= 0;
+	}
+
+	static bool matchAnyOrPattern(const string &haystack, const string &pattern)
+	{
+		size_t pos = 0;
+		while (true)
+		{
+			size_t sep = pattern.find("||", pos);
+			string candidate = (sep == string::npos) ? pattern.substr(pos) : pattern.substr(pos, sep - pos);
+			if (haystack.find(candidate) != string::npos)
+				return true;
+			if (sep == string::npos)
+				break;
+			pos = sep + 2;
+		}
+		return false;
+	}
+
+	static bool parseRepeatedBodyPattern(const string &pattern, char &expectedChar, size_t &expectedCount)
+	{
+		size_t repeatedPos = pattern.find(" repeated ");
+		size_t timesPos = pattern.find(" times");
+		if (repeatedPos == string::npos || timesPos == string::npos || timesPos <= repeatedPos + 9)
+			return false;
+
+		size_t quoteStart = pattern.find("'");
+		if (quoteStart == string::npos || quoteStart + 2 >= pattern.size() || pattern[quoteStart + 2] != '\'')
+			return false;
+		expectedChar = pattern[quoteStart + 1];
+
+		string countStr = pattern.substr(repeatedPos + 9, timesPos - (repeatedPos + 9));
+		if (countStr.empty())
+			return false;
+
+		char *endPtr = NULL;
+		unsigned long long parsed = strtoull(countStr.c_str(), &endPtr, 10);
+		if (endPtr == NULL || *endPtr != '\0')
+			return false;
+
+		expectedCount = static_cast<size_t>(parsed);
+		return true;
+	}
+
+	static void buildStreamingExpectations(const TestCase &config, StreamingResponseState &state)
+	{
+		for (size_t i = 0; i < config.expectedResponse.size(); ++i)
+		{
+			const string &pattern = config.expectedResponse[i];
+			char repeatedChar = '\0';
+			size_t repeatedCount = 0;
+			if (!state.bodyPatternEnabled &&
+				pattern.find(" repeated ") != string::npos &&
+				parseRepeatedBodyPattern(pattern, repeatedChar, repeatedCount))
+			{
+				state.bodyPatternEnabled = true;
+				state.bodyExpectedChar = repeatedChar;
+				state.bodyExpectedCount = repeatedCount;
+			}
+			else
+			{
+				state.headerExpectedPatterns.push_back(pattern);
+			}
+		}
+	}
+
+	static bool validateHeaderPatterns(const string &header, const vector<string> &patterns, string &failReason)
+	{
+		for (size_t i = 0; i < patterns.size(); ++i)
+		{
+			if (!matchAnyOrPattern(header, patterns[i]))
+			{
+				failReason = string("Response did not match expected pattern: ") + patterns[i];
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static bool parseContentLengthHeader(const string &header, size_t &contentLength)
+	{
+		string lowered = toLowerCopy(header);
+		size_t pos = lowered.find("content-length:");
+		if (pos == string::npos)
+			return false;
+
+		pos += strlen("content-length:");
+		while (pos < lowered.size() && isspace((unsigned char)lowered[pos]))
+			++pos;
+		size_t endPos = lowered.find("\r\n", pos);
+		if (endPos == string::npos)
+			return false;
+
+		string lengthStr = lowered.substr(pos, endPos - pos);
+		if (lengthStr.empty())
+			return false;
+
+		char *endPtr = NULL;
+		unsigned long long parsed = strtoull(lengthStr.c_str(), &endPtr, 10);
+		if (endPtr == NULL || *endPtr != '\0')
+			return false;
+
+		contentLength = static_cast<size_t>(parsed);
+		return true;
+	}
+
+	static bool hasChunkedTransferEncoding(const string &header)
+	{
+		string lowered = toLowerCopy(header);
+		return lowered.find("transfer-encoding:") != string::npos && lowered.find("chunked") != string::npos;
+	}
+
+	static bool validateStreamingBodyBytes(StreamingResponseState &state, const char *data, size_t length, string &failReason)
+	{
+		if (!state.bodyPatternEnabled)
+			return true;
+
+		for (size_t i = 0; i < length; ++i)
+		{
+			if (data[i] != state.bodyExpectedChar)
+			{
+				failReason = string("Body mismatch: expected only '") + state.bodyExpectedChar + "' characters.";
+				return false;
+			}
+		}
+
+		if (state.bodyCount + length > state.bodyExpectedCount)
+		{
+			size_t observedAtLeast = state.bodyCount + length;
+			state.bodyCount = observedAtLeast;
+			state.decodedBodyBytes += length;
+			failReason = "Body larger than expected repeated-count pattern (expected " +
+				to_string(state.bodyExpectedCount) + ", received at least " +
+				to_string(observedAtLeast) + ").";
+			return false;
+		}
+
+		state.bodyCount += length;
+		return true;
+	}
+
+	static bool parseChunkSizeLine(const string &sizeLineRaw, size_t &chunkSize)
+	{
+		string sizeLine = sizeLineRaw;
+		size_t extensionPos = sizeLine.find(';');
+		if (extensionPos != string::npos)
+			sizeLine = sizeLine.substr(0, extensionPos);
+		if (sizeLine.empty())
+			return false;
+
+		char *endPtr = NULL;
+		unsigned long long parsed = strtoull(sizeLine.c_str(), &endPtr, 16);
+		if (endPtr == NULL || *endPtr != '\0')
+			return false;
+
+		chunkSize = static_cast<size_t>(parsed);
+		return true;
+	}
+
+	static bool consumeIdentityBody(const char *data, size_t length, StreamingResponseState &state, string &failReason)
+	{
+		if (!validateStreamingBodyBytes(state, data, length, failReason))
+			return false;
+
+		state.decodedBodyBytes += length;
+		if (state.hasContentLength)
+		{
+			if (state.decodedBodyBytes > state.contentLength)
+			{
+				failReason = "Body larger than declared Content-Length.";
+				return false;
+			}
+			if (state.decodedBodyBytes == state.contentLength)
+				state.responseComplete = true;
+		}
+
+		return true;
+	}
+
+	static bool consumeChunkedBody(const char *data, size_t length, StreamingResponseState &state, string &failReason)
+	{
+		size_t cursor = 0;
+		while (cursor < length)
+		{
+			if (state.chunkState == STREAM_CHUNK_DONE)
+			{
+				failReason = "Received bytes after final chunk terminator.";
+				return false;
+			}
+
+			if (state.chunkState == STREAM_CHUNK_READ_SIZE)
+			{
+				state.chunkLineBuffer.push_back(data[cursor++]);
+				size_t lineLen = state.chunkLineBuffer.size();
+				if (lineLen >= 2 && state.chunkLineBuffer[lineLen - 2] == '\r' && state.chunkLineBuffer[lineLen - 1] == '\n')
+				{
+					string line = state.chunkLineBuffer.substr(0, lineLen - 2);
+					state.chunkLineBuffer.clear();
+					if (!parseChunkSizeLine(line, state.chunkBytesRemaining))
+					{
+						failReason = "Invalid chunk size in response body.";
+						return false;
+					}
+					if (state.chunkBytesRemaining == 0)
+					{
+						state.chunkState = STREAM_CHUNK_READ_TRAILERS;
+						state.trailerBuffer.clear();
+					}
+					else
+						state.chunkState = STREAM_CHUNK_READ_DATA;
+				}
+				continue;
+			}
+
+			if (state.chunkState == STREAM_CHUNK_READ_DATA)
+			{
+				size_t available = length - cursor;
+				size_t toConsume = min(available, state.chunkBytesRemaining);
+				if (!validateStreamingBodyBytes(state, data + cursor, toConsume, failReason))
+					return false;
+				state.decodedBodyBytes += toConsume;
+				state.chunkBytesRemaining -= toConsume;
+				cursor += toConsume;
+				if (state.chunkBytesRemaining == 0)
+					state.chunkState = STREAM_CHUNK_EXPECT_DATA_CR;
+				continue;
+			}
+
+			if (state.chunkState == STREAM_CHUNK_EXPECT_DATA_CR)
+			{
+				if (data[cursor] != '\r')
+				{
+					failReason = "Invalid chunk delimiter (expected CR).";
+					return false;
+				}
+				++cursor;
+				state.chunkState = STREAM_CHUNK_EXPECT_DATA_LF;
+				continue;
+			}
+
+			if (state.chunkState == STREAM_CHUNK_EXPECT_DATA_LF)
+			{
+				if (data[cursor] != '\n')
+				{
+					failReason = "Invalid chunk delimiter (expected LF).";
+					return false;
+				}
+				++cursor;
+				state.chunkState = STREAM_CHUNK_READ_SIZE;
+				continue;
+			}
+
+			if (state.chunkState == STREAM_CHUNK_READ_TRAILERS)
+			{
+				state.trailerBuffer.push_back(data[cursor++]);
+				size_t trailerLen = state.trailerBuffer.size();
+				if (state.trailerBuffer == "\r\n")
+				{
+					state.chunkState = STREAM_CHUNK_DONE;
+					state.responseComplete = true;
+					continue;
+				}
+				if (trailerLen >= 4 && state.trailerBuffer.substr(trailerLen - 4) == "\r\n\r\n")
+				{
+					state.chunkState = STREAM_CHUNK_DONE;
+					state.responseComplete = true;
+					continue;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	static bool consumeBodyBytes(const char *data, size_t length, StreamingResponseState &state, string &failReason)
+	{
+		if (length == 0)
+			return true;
+		if (state.chunkedResponse)
+			return consumeChunkedBody(data, length, state, failReason);
+		return consumeIdentityBody(data, length, state, failReason);
+	}
+
+	static bool processIncomingResponseData(TestCase &config, StreamingResponseState &state, const char *data, size_t length, string &failReason)
+	{
+		if (!state.headerComplete)
+		{
+			state.headerBuffer.append(data, length);
+			size_t headerEnd = state.headerBuffer.find("\r\n\r\n");
+			if (headerEnd == string::npos)
+			{
+				if (state.headerBuffer.size() > 65536)
+				{
+					failReason = "Response header is too large.";
+					return false;
+				}
+				return true;
+			}
+
+			size_t bodyStart = headerEnd + 4;
+			string bodyRemainder;
+			if (bodyStart < state.headerBuffer.size())
+				bodyRemainder = state.headerBuffer.substr(bodyStart);
+
+			state.headerBuffer.erase(bodyStart);
+			state.headerComplete = true;
+			state.chunkedResponse = hasChunkedTransferEncoding(state.headerBuffer);
+			state.hasContentLength = parseContentLengthHeader(state.headerBuffer, state.contentLength);
+
+			config.headerLength = state.headerBuffer.size();
+			config.response = state.headerBuffer;
+			config.contentLength = state.hasContentLength ? state.contentLength : 0;
+
+			if (!validateHeaderPatterns(state.headerBuffer, state.headerExpectedPatterns, failReason))
+				return false;
+
+			if (state.bodyPatternEnabled && state.hasContentLength && state.contentLength != state.bodyExpectedCount)
+			{
+				failReason = "Content-Length does not match expected repeated body size.";
+				return false;
+			}
+
+			if (!state.chunkedResponse && state.hasContentLength && state.contentLength == 0)
+				state.responseComplete = true;
+
+			if (!bodyRemainder.empty())
+				return consumeBodyBytes(bodyRemainder.c_str(), bodyRemainder.size(), state, failReason);
+			return true;
+		}
+
+		return consumeBodyBytes(data, length, state, failReason);
+	}
+
+	static string buildStreamingBodySummary(const StreamingResponseState &state)
+	{
+		if (state.bodyPatternEnabled)
+		{
+			stringstream summary;
+			summary << "'" << state.bodyExpectedChar << "' repeated " << state.bodyCount << " times";
+			return summary.str();
+		}
+		if (state.decodedBodyBytes == 0)
+			return "(empty)";
+		return "body size " + to_string(state.decodedBodyBytes) + " bytes";
+	}
+
+	static string buildStreamingSendSplitProgress(size_t sentBytes, size_t headerPlannedBytes, size_t bodyPlannedBytes)
+	{
+		size_t sentHeaderBytes = min(sentBytes, headerPlannedBytes);
+		size_t sentBodyBytes = 0;
+		if (sentBytes > headerPlannedBytes)
+			sentBodyBytes = sentBytes - headerPlannedBytes;
+
+		return "Streaming request... (header " +
+			to_string(sentHeaderBytes) + "/" + to_string(headerPlannedBytes) +
+			" bytes, body " + to_string(sentBodyBytes) + "/" +
+			to_string(bodyPlannedBytes) + " bytes)";
+	}
+
+	static bool onResponsePeerClosed(StreamingResponseState &state, string &failReason)
+	{
+		if (!state.headerComplete)
+		{
+			failReason = "Connection closed before response headers were complete.";
+			return false;
+		}
+
+		if (state.chunkedResponse)
+		{
+			if (!state.responseComplete)
+			{
+				failReason = "Connection closed before receiving the final chunk.";
+				return false;
+			}
+			return true;
+		}
+
+		if (state.hasContentLength && state.decodedBodyBytes != state.contentLength)
+		{
+			failReason = "Connection closed before receiving full Content-Length body.";
+			return false;
+		}
+
+		state.responseComplete = true;
+		return true;
+	}
+
+	static bool finalizeStreamingValidation(const StreamingResponseState &state, string &failReason)
+	{
+		if (!state.headerComplete)
+		{
+			failReason = "No complete response header received.";
+			return false;
+		}
+
+		if (state.bodyPatternEnabled && state.bodyCount != state.bodyExpectedCount)
+		{
+			failReason = "Response body size does not match expected repeated-count pattern.";
+			return false;
+		}
+
+		if (state.hasContentLength && state.decodedBodyBytes != state.contentLength)
+		{
+			failReason = "Decoded body length does not match Content-Length.";
+			return false;
+		}
+
+		return true;
+	}
+
+	static char getStreamingBodyChar(const string &description)
+	{
+		size_t charStart = description.find("'");
+		if (charStart != string::npos && charStart + 2 < description.size())
+			return description[charStart + 1];
+		return 'x';
+	}
+
+	static void initStreamingSendState(TestCase &config, StreamingSendState &sendState)
+	{
+		sendState.headerSize = config.request.size();
+		sendState.totalSendSize = sendState.headerSize;
+		sendState.hasGeneratedBody = config.bodyTotalSize > 0;
+		sendState.payloadBytesPlanned = config.bodyTotalSize;
+
+		if (config.chunkGenerated)
+		{
+			size_t totalChunkCount = config.chunksRemaining;
+			size_t totalChunkedBytes = totalChunkCount * config.chunkedBodyStart.size() + config.chunkedBodyEnd.size();
+			sendState.totalSendSize += totalChunkedBytes;
+		}
+		else if (sendState.hasGeneratedBody)
+		{
+			sendState.totalSendSize += config.bodyTotalSize;
+			char bodyChar = getStreamingBodyChar(config.bodyDescription);
+			size_t segmentSize = min(config.bodyTotalSize, (size_t)config.maxSend);
+			sendState.bodySegment = string(segmentSize, bodyChar);
+		}
+	}
+
+	static bool sendHeaderStep(TestCase &config, StreamingSendState &sendState, bool &progress, string &failReason)
+	{
+		if (sendState.headerSendComplete)
+			return true;
+
+		size_t remaining = sendState.headerSize - sendState.headerSentBytes;
+		size_t toSend = (remaining > config.maxSend) ? config.maxSend : remaining;
+
+		int sentBytes = 0;
+		if (!sendSocketData(config.socketIO, config.request.c_str() + sendState.headerSentBytes, toSend, sentBytes))
+		{
+			failReason = "Failed to send request headers.";
+			return false;
+		}
+
+		if (sentBytes > 0)
+		{
+			progress = true;
+			sendState.headerSentBytes += sentBytes;
+			config.sendedBytes += sentBytes;
+		}
+
+		sendState.headerSendComplete = sendState.headerSentBytes >= sendState.headerSize;
+		// sleep(1);
+		return true;
+	}
+
+	static bool sendChunkedBodyStep(TestCase &config, bool &progress, string &failReason)
+	{
+		if (config.chunksRemaining == 0 && !config.sendingEndChunk && config.chunkedBodyEndSentBytes == 0)
+			config.sendingEndChunk = true;
+
+		if (config.chunksRemaining > 0 && !config.sendingEndChunk)
+		{
+			size_t remainingInChunk = config.chunkedBodyStart.size() - config.chunkedBodyStartSentBytes;
+			size_t toSend = (remainingInChunk > config.maxSend) ? config.maxSend : remainingInChunk;
+
+			int sentBytes = 0;
+			if (!sendSocketData(config.socketIO,
+							config.chunkedBodyStart.c_str() + config.chunkedBodyStartSentBytes,
+							toSend,
+							sentBytes))
+			{
+				failReason = "Failed to send chunked body segment.";
+				return false;
+			}
+
+			if (sentBytes > 0)
+			{
+				progress = true;
+				config.chunkedBodyStartSentBytes += sentBytes;
+				config.sendedBytes += sentBytes;
+
+				if (config.chunkedBodyStartSentBytes >= config.chunkedBodyStart.size())
+				{
+					config.chunkedBodyStartSentBytes = 0;
+					if (config.chunksRemaining > 0)
+						config.chunksRemaining--;
+					if (config.chunksRemaining == 0)
+						config.sendingEndChunk = true;
+				}
+			}
+			return true;
+		}
+
+		if (config.sendingEndChunk && config.chunkedBodyEndSentBytes < config.chunkedBodyEnd.size())
+		{
+			size_t remainingEnd = config.chunkedBodyEnd.size() - config.chunkedBodyEndSentBytes;
+			size_t toSend = (remainingEnd > config.maxSend) ? config.maxSend : remainingEnd;
+
+			int sentBytes = 0;
+			if (!sendSocketData(config.socketIO,
+							config.chunkedBodyEnd.c_str() + config.chunkedBodyEndSentBytes,
+							toSend,
+							sentBytes))
+			{
+				failReason = "Failed to send chunked terminator.";
+				return false;
+			}
+
+			if (sentBytes > 0)
+			{
+				progress = true;
+				config.chunkedBodyEndSentBytes += sentBytes;
+				config.sendedBytes += sentBytes;
+			}
+		}
+
+		return true;
+	}
+
+	static bool sendGeneratedBodyStep(TestCase &config, StreamingSendState &sendState, bool &progress, string &failReason)
+	{
+		if (config.bodyGeneratedBytes >= config.bodyTotalSize)
+			return true;
+
+		size_t remainingBody = config.bodyTotalSize - config.bodyGeneratedBytes;
+		size_t toSend = (remainingBody > config.maxSend) ? config.maxSend : remainingBody;
+		if (toSend > sendState.bodySegment.size())
+			toSend = sendState.bodySegment.size();
+
+		int sentBytes = 0;
+		if (!sendSocketData(config.socketIO, sendState.bodySegment.c_str(), toSend, sentBytes))
+		{
+			failReason = "Failed to send generated body segment.";
+			return false;
+		}
+
+		if (sentBytes > 0)
+		{
+			progress = true;
+			config.bodyGeneratedBytes += sentBytes;
+			config.sendedBytes += sentBytes;
+		}
+
+		return true;
+	}
+
+	static bool sendStreamingRequestStep(TestCase &config, StreamingSendState &sendState, bool &progress, string &failReason)
+	{
+		progress = false;
+		if (sendState.requestSendComplete)
+			return true;
+
+		if (!sendHeaderStep(config, sendState, progress, failReason))
+			return false;
+		if (!sendState.headerSendComplete)
+			return true;
+		
+
+		if (config.chunkGenerated)
+		{
+			if (!sendChunkedBodyStep(config, progress, failReason))
+				return false;
+			sendState.requestSendComplete =
+				(config.chunksRemaining == 0 &&
+				 config.sendingEndChunk &&
+				 config.chunkedBodyEndSentBytes >= config.chunkedBodyEnd.size());
+			return true;
+		}
+
+		if (sendState.hasGeneratedBody)
+		{
+			if (!sendGeneratedBodyStep(config, sendState, progress, failReason))
+				return false;
+			sendState.requestSendComplete = (config.bodyGeneratedBytes >= config.bodyTotalSize);
+			return true;
+		}
+
+		sendState.requestSendComplete = true;
+		return true;
+	}
+
 } // namespace
 
 vector<ATestList *> ATestList::_testLists;
@@ -220,18 +893,21 @@ static string toHex(size_t value)
 	return hexStream.str();
 }
 
+static char getRepeatedBodyChar(const string &description)
+{
+	size_t charStart = description.find("'");
+	if (charStart != string::npos && charStart + 2 < description.size())
+		return description[charStart + 1];
+	return 'x';
+}
+
 void ATestList::CreateChunkedBody(TestCase &config)
 {
 	config.chunkGenerated = config.bodyDescription.find("chunked") != string::npos;
 	if (!config.chunkGenerated)
 		return;
 
-	char bodyChar = 'x';
-	size_t charStart = config.bodyDescription.find("'");
-	if (charStart != string::npos && charStart + 2 < config.bodyDescription.size())
-	{
-		bodyChar = config.bodyDescription[charStart + 1];
-	}
+	char bodyChar = getRepeatedBodyChar(config.bodyDescription);
 	// Generate only ONE chunk
 	config.chunkedBodyStart = generateChunkStartHeader(config.bodyDescription, config.chunkSize);
 	config.chunkedBodyStart += generateBodySegment(bodyChar, config.chunkSize);
@@ -321,11 +997,19 @@ bool ATestList::SendRequestToServer(TestCase &config)
 
 	size_t headerSize = config.request.size();
 	size_t totalSize = headerSize;
+	bool hasGeneratedBody = config.bodyTotalSize > 0;
+	char generatedBodyChar = getRepeatedBodyChar(config.bodyDescription);
+	string bodySegment;
 	if (config.chunkGenerated)
 	{
 		size_t totalChunkCount = config.chunksRemaining;
 		size_t totalChunkedBytes = totalChunkCount * config.chunkedBodyStart.size() + config.chunkedBodyEnd.size();
 		totalSize += totalChunkedBytes;
+	}
+	else if (hasGeneratedBody)
+	{
+		totalSize += config.bodyTotalSize;
+		bodySegment = generateBodySegment(generatedBodyChar, min(config.bodyTotalSize, (size_t)config.maxSend));
 	}
 	bool headerSendComplete = false;
 
@@ -391,6 +1075,31 @@ bool ATestList::SendRequestToServer(TestCase &config)
 			{
 				break;
 			}
+		}
+		else if (hasGeneratedBody)
+		{
+			// Phase 2: Send non-chunked body progressively using Content-Length.
+			size_t remainingBody = config.bodyTotalSize - config.bodyGeneratedBytes;
+			if (remainingBody == 0)
+				break;
+
+			size_t toSend = remainingBody;
+			if (toSend > config.maxSend)
+				toSend = config.maxSend;
+
+			sentBytes = config.socketIO->Send((void *)bodySegment.c_str(), toSend);
+			if (sentBytes <= 0)
+			{
+				failChild(config, "send generated body");
+				CLI::printError("Failed to send generated body to the server.");
+				return false;
+			}
+
+			config.bodyGeneratedBytes += sentBytes;
+			config.sendedBytes += sentBytes;
+
+			if (config.bodyGeneratedBytes >= config.bodyTotalSize)
+				break;
 		}
 		else
 		{
@@ -659,6 +1368,8 @@ void ATestList::printServerResponseHeader(TestCase &config)
 	{
 		splitHttpMessage(config.response, responseHeader, responseBody);
 	}
+	if (responseBody.empty() && !config.streamedResponseBodySummary.empty())
+		responseBody = config.streamedResponseBodySummary;
 	while (true)
 	{
 		if (!_showSingleTestDetails)
@@ -671,6 +1382,12 @@ void ATestList::printServerResponseHeader(TestCase &config)
 			cout << CLI::midLine() << endl;
 			for (size_t i = 0; i < config.expectedResponse.size(); i++)
 				CLI::printWrapped(cout, string("Expected: ") + config.expectedResponse[i], CLR_WARN);
+			if (!config.streamedResponseBodySummary.empty())
+				CLI::printWrapped(cout, string("Observed body: ") + config.streamedResponseBodySummary, CLR_DIM);
+			if (config.streamedRequestHeaderSize > 0 || config.streamedRequestPayloadSize > 0)
+				CLI::printWrapped(cout, string("Sent request sizes: header ") + to_string(config.streamedRequestHeaderSize) + " bytes, body " + to_string(config.streamedRequestPayloadSize) + " bytes", CLR_DIM);
+			if (config.streamedResponseHeaderSize > 0 || config.streamedResponseBodyBytes > 0)
+				CLI::printWrapped(cout, string("Observed response sizes: header ") + to_string(config.streamedResponseHeaderSize) + " bytes, body " + to_string(config.streamedResponseBodyBytes) + " bytes", CLR_DIM);
 			cout << CLI::botLine() << endl;
 			return;
 		}
@@ -692,6 +1409,12 @@ void ATestList::printServerResponseHeader(TestCase &config)
 			for (size_t i = 0; i < config.expectedResponse.size(); i++)
 				CLI::printWrapped(cout, string("Expected: ") + config.expectedResponse[i], CLR_WARN);
 		}
+		if (!config.streamedResponseBodySummary.empty())
+			CLI::printWrapped(cout, string("Observed body: ") + config.streamedResponseBodySummary, CLR_DIM);
+		if (config.streamedRequestHeaderSize > 0 || config.streamedRequestPayloadSize > 0)
+			CLI::printWrapped(cout, string("Sent request sizes: header ") + to_string(config.streamedRequestHeaderSize) + " bytes, body " + to_string(config.streamedRequestPayloadSize) + " bytes", CLR_DIM);
+		if (config.streamedResponseHeaderSize > 0 || config.streamedResponseBodyBytes > 0)
+			CLI::printWrapped(cout, string("Observed response sizes: header ") + to_string(config.streamedResponseHeaderSize) + " bytes, body " + to_string(config.streamedResponseBodyBytes) + " bytes", CLR_DIM);
 		cout << CLI::midLine() << endl;
 		cout << CLI::row(string(CLR_MENU_NUM) + "  1" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + "Print Tester Body" + RESET) << endl;
 		cout << CLI::row(string(CLR_MENU_NUM) + "  2" + RESET + CLR_DIM + "  " + SYM_RAQUO + " " + RESET + CLR_MENU_OPT + "Print Server Body" + RESET) << endl;
@@ -712,12 +1435,12 @@ void ATestList::printServerResponseHeader(TestCase &config)
 			cout << CLI::midLine() << endl;
 			string bodyToDisplay = requestBody;
 			// If request uses chunked encoding, decode it first before displaying
-			if (toLowerCopy(requestHeader).find("transfer-encoding: chunked") != string::npos)
-			{
-				string decodedBody;
-				if (decodeChunkedBodyForDisplay(requestBody, decodedBody))
-					bodyToDisplay = decodedBody;
-			}
+			// if (toLowerCopy(requestHeader).find("transfer-encoding: chunked") != string::npos)
+			// {
+			// 	string decodedBody;
+			// 	if (decodeChunkedBodyForDisplay(requestBody, decodedBody))
+			// 		bodyToDisplay = decodedBody;
+			// }
 			string compressedBody = compressRepeatedCharsForDisplay(bodyToDisplay);
 			CLI::printLines(cout, compressedBody.empty() ? string("(empty)") : compressedBody, CLR_DIM);
 		}
@@ -865,6 +1588,11 @@ void ATestList::RunTestCase(TestCase &config)
 	config.sendingEndChunk = false;
 	config.chunkGenerated = false;
 	config.response.clear();
+	config.streamedResponseBodySummary.clear();
+	config.streamedResponseBodyBytes = 0;
+	config.streamedRequestPayloadSize = 0;
+	config.streamedRequestHeaderSize = 0;
+	config.streamedResponseHeaderSize = 0;
 
 	// Setup body description for progressive generation
 	if (!config.body.empty())
@@ -887,6 +1615,7 @@ void ATestList::RunTestCase(TestCase &config)
 		multiplexer.DeleteFromEpoll(config.socketIO);
 		return;
 	}
+	shutdown(config.socketIO->GetFd(), SHUT_WR);
 	if (!ReadResponseFromServer(config))
 	{
 		multiplexer.DeleteFromEpoll(config.socketIO);
@@ -895,6 +1624,230 @@ void ATestList::RunTestCase(TestCase &config)
 	// assert
 	actServerResponse(config);
 	multiplexer.DeleteFromEpoll(config.socketIO);
+	} while (_reRunTest);
+}
+
+void ATestList::RunStreamingTestCase(TestCase &config)
+{
+	do
+	{
+		_reRunTest = false;
+
+		config.sendedBytes = 0;
+		config.chunkedBodyStartSentBytes = 0;
+		config.chunkedBodyEndSentBytes = 0;
+		config.chunksRemaining = 0;
+		config.sendingEndChunk = false;
+		config.chunkGenerated = false;
+		config.response.clear();
+		config.streamedResponseBodySummary.clear();
+		config.streamedResponseBodyBytes = 0;
+		config.streamedRequestPayloadSize = 0;
+		config.streamedRequestHeaderSize = 0;
+		config.streamedResponseHeaderSize = 0;
+		config.headerLength = 0;
+		config.contentLength = 0;
+		config.passed = false;
+		config.bodyGeneratedBytes = 0;
+		config.bodyTotalSize = 0;
+		config.bodyDescription.clear();
+
+		if (!config.body.empty())
+		{
+			config.bodyDescription = config.body;
+			config.bodyTotalSize = getBodyTotalSize(config.body);
+			config.isBodyGenerationComplete = false;
+		}
+
+		string requestHeader;
+		string requestBody;
+		splitHttpMessage(config.request, requestHeader, requestBody);
+		config.streamedRequestHeaderSize = requestHeader.size();
+		config.streamedRequestPayloadSize = (config.bodyTotalSize > 0) ? config.bodyTotalSize : requestBody.size();
+
+		if (config.printTest)
+			printTestCard(config);
+		if (config.printTest && !config.isSubTest)
+			CLI::printHint("Streaming request sizes: header " + to_string(config.streamedRequestHeaderSize) + " bytes, body " + to_string(config.streamedRequestPayloadSize) + " bytes");
+
+		if (!connectToServer(config))
+			return;
+		if (!setSocketNonBlocking(config.socketIO->GetFd()))
+		{
+			failChild(config, "set socket non-blocking");
+			CLI::printError("Failed to enable non-blocking mode for streaming test.");
+			multiplexer.DeleteFromEpoll(config.socketIO);
+			return;
+		}
+
+		CreateChunkedBody(config);
+
+		StreamingSendState sendState;
+		initStreamingSendState(config, sendState);
+		if (sendState.payloadBytesPlanned == 0)
+			sendState.payloadBytesPlanned = config.streamedRequestPayloadSize;
+
+		StreamingResponseState responseState;
+		buildStreamingExpectations(config, responseState);
+
+		if (!multiplexer.AddAsEpollOut(config.socketIO))
+		{
+			failChild(config, "add socket to epoll");
+			CLI::printError("Failed to add socket to epoll.");
+			return;
+		}
+		multiplexer.ChangeToEpollInOut(config.socketIO);
+
+		bool done = false;
+		string failReason;
+
+		while (!done)
+		{
+			int eventCount = multiplexer.epollWait(config.timeout);
+			if (eventCount == -1)
+			{
+				failReason = "epollWait -1";
+				break;
+			}
+			if (eventCount == 0)
+			{
+				failReason = "epollWait timeout";
+				break;
+			}
+
+			for (int i = 0; i < eventCount && !done; ++i)
+			{
+				unsigned int events = multiplexer.eventList[i].events;
+
+				if (events & EPOLLOUT)
+				{
+					bool sendProgress = false;
+					if (!sendStreamingRequestStep(config, sendState, sendProgress, failReason))
+					{
+						done = true;
+						break;
+					}
+					if (sendProgress && config.isSubTest == false && config.printTest)
+					{
+						CLI::printHintProgress(buildStreamingSendSplitProgress(config.sendedBytes,
+							sendState.headerSize,
+							sendState.payloadBytesPlanned));
+					}
+					if (sendState.requestSendComplete && !sendState.writeShutdownSent)
+					{
+						shutdown(config.socketIO->GetFd(), SHUT_WR);
+						if (!multiplexer.ChangeToEpollIn(config.socketIO))
+						{
+							failReason = "Failed to switch socket to response-read mode.";
+							done = true;
+							break;
+						}
+						sendState.writeShutdownSent = true;
+						if (config.printTest && !config.isSubTest)
+							CLI::printHint("Request fully sent. Waiting for response...");
+					}
+				}
+
+				if (events & EPOLLIN)
+				{
+						int receivedBytes = read(config.socketIO->GetFd(), config.responseBuffer, KBYTE);
+						if (receivedBytes > 0)
+						{
+							if (!processIncomingResponseData(config, responseState, config.responseBuffer, (size_t)receivedBytes, failReason))
+							{
+								done = true;
+								break;
+							}
+							if (responseState.responseComplete)
+							{
+								done = true;
+								cout << "Here 2";
+								break;
+							}
+							continue;
+						}
+						if (receivedBytes == 0)
+						{
+							onResponsePeerClosed(responseState, failReason);
+							done = true;
+						}
+						else if (!isWouldBlockError())
+						{
+							failReason = "Failed to receive response from the server.";
+							done = true;
+						}
+				}
+
+				if (events & (EPOLLERR | EPOLLHUP))
+				{
+					if (!responseState.responseComplete)
+					{
+						if (!onResponsePeerClosed(responseState, failReason))
+						{
+							done = true;
+							break;
+						}
+					}
+					done = true;
+				}
+			}
+
+			if (!failReason.empty())
+				break;
+			if (responseState.responseComplete)
+				break;
+		}
+
+		bool passed = false;
+		config.streamedResponseBodyBytes = responseState.decodedBodyBytes;
+		config.streamedResponseHeaderSize = config.headerLength;
+		config.streamedResponseBodySummary = buildStreamingBodySummary(responseState);
+		if (failReason.empty())
+		{
+			if (finalizeStreamingValidation(responseState, failReason))
+				passed = true;
+		}
+
+		if (config.isSubTest)
+		{
+			config.passed = passed;
+		}
+		else if (passed)
+		{
+			config.passed = true;
+			_passedTests++;
+			_failedTests--;
+			if (config.printTest)
+				cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+		}
+		else
+		{
+			failChild(config, failReason.empty() ? string("streaming validation failed") : failReason);
+			config.passed = false;
+			if (!config.isSubTest)
+			{
+				cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET;
+				if (!failReason.empty())
+					cerr << CLR_DIM << "  (reason: " << failReason << ")" << RESET;
+				cerr << endl;
+			}
+		}
+
+		if (config.isSubTest == false && config.printTest)
+		{
+			CLI::printHintProgress(buildStreamingSendSplitProgress(config.sendedBytes,
+				sendState.headerSize,
+				sendState.payloadBytesPlanned));
+			cout << endl;
+			CLI::printHint("Observed response sizes: header " + to_string(config.streamedResponseHeaderSize) + " bytes, body " + to_string(config.streamedResponseBodyBytes) + " bytes");
+			if (!config.streamedResponseBodySummary.empty())
+				CLI::printHint("Observed response body: " + config.streamedResponseBodySummary);
+		}
+
+		if (!config.isSubTest && (config.printTest || config.passed == false))
+			printServerResponseHeader(config);
+
+		multiplexer.DeleteFromEpoll(config.socketIO);
 	} while (_reRunTest);
 }
 
@@ -1118,7 +2071,14 @@ bool ATestList::runChildTestCase(TestCase &childConfig)
 		childConfig.headerLength = 0;
 		childConfig.contentLength = 0;
 
-		RunTestCase(childConfig);
+		if (childConfig.request.find("POST") != string::npos)
+		{
+			RunStreamingTestCase(childConfig);
+		}
+		else
+		{
+			RunTestCase(childConfig);
+		}
 		if (childConfig.passed)
 		{
 			write(childConfig.pipeFd[1], &pass, sizeof(int));

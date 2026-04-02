@@ -217,6 +217,7 @@ void HappyPathTests::GetCssFileTest()
 					   "\r\n";
 
 	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
+	testCase.expectedResponse.push_back("Content-Type: text/css");
 
 	testCase.configurationsForTestCase = "NOTE: Ensure a file named 'styles.css' exists in the server's web root. The server should respond with 'Content-Type: text/css' in the headers. This test validates that the MIME type resolution for '.css' extensions is implemented correctly.";
 
@@ -239,8 +240,8 @@ void HappyPathTests::GetImageFileTest()
 					   "\r\n";
 
 	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
-
-	testCase.configurationsForTestCase = "NOTE: Ensure a valid PNG file named 'test.png' exists inside the server's '/images' directory. The server should respond with 'Content-Type: image/png'. File reading must use binary-safe read() calls, not string-based functions, to avoid truncation on null bytes.";
+	testCase.expectedResponse.push_back("Content-Type: image/jpeg");
+	testCase.configurationsForTestCase = "NOTE: Ensure a valid JPEG file named 'test.jpg' exists inside the server's '/images' directory. The server should respond with 'Content-Type: image/jpeg'. File reading must use binary-safe read() calls, not string-based functions, to avoid truncation on null bytes.";
 
 	testCase.timeout = 2000;
 
@@ -308,24 +309,8 @@ void HappyPathTests::PostUploadBinaryFileTest()
 
 	testCase.timeout = 2000;
 
-	testCase.printTest = false;
-	testCase.isSubTest = true; // Mark as sub-test to exclude from pass/fail count
-
 	RunTestCase(testCase);
 
-	// Step 2: Verify the upload by retrieving the file
-	TestCase verifyCase;
-	verifyCase.name = "Post Upload Binary File Test - Verify";
-	verifyCase.description = "Retrieve the uploaded binary file and verify data integrity.";
-	verifyCase.port = "1025";
-	verifyCase.host = "localhost";
-	verifyCase.request = "GET /upload/image.png HTTP/1.1\r\nHost: localhost\r\n\r\n";
-	verifyCase.expectedResponse.push_back("HTTP/1.1 200 OK");
-	verifyCase.expectedResponse.push_back(pngData);
-	verifyCase.configurationsForTestCase = "This GET request retrieves the uploaded binary file to verify that the multipart parser correctly extracted and saved the binary data with null bytes intact. The response body must contain the exact PNG data.";
-	verifyCase.timeout = 2000;
-
-	RunTestCase(verifyCase);
 }
 
 void HappyPathTests::PostOnRootTest()

@@ -29,6 +29,7 @@ class MinimumEvaluationTests : public ATestList
     
     // Chunked transfer encoding tests
     void ChunkedLarge100MYChars();
+    void ContentLengthLarge100MYChars();
     void ChunkedLarge100MEChars();
     void Chunked100KEChars();
     

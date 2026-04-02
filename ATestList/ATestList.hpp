@@ -18,6 +18,11 @@ struct TestCase
 	size_t sendedBytes;
 	char *responseBuffer;
 	string response;
+	string streamedResponseBodySummary;
+	size_t streamedResponseBodyBytes;
+	size_t streamedRequestPayloadSize;
+	size_t streamedRequestHeaderSize;
+	size_t streamedResponseHeaderSize;
 	size_t contentLength;
 	size_t headerLength;
 	bool passed;
@@ -47,7 +52,7 @@ struct TestCase
 	bool sendingEndChunk;
 	bool isSubTest;
 	int childIndex; // For tracking which child process is sending in forked tests
-	TestCase() : sendedBytes(0), passed(false), printTest(true), bodyGeneratedBytes(0), bodyTotalSize(0),
+	TestCase() : sendedBytes(0), streamedResponseBodyBytes(0), streamedRequestPayloadSize(0), streamedRequestHeaderSize(0), streamedResponseHeaderSize(0), passed(false), printTest(true), bodyGeneratedBytes(0), bodyTotalSize(0),
 				 isBodyGenerationComplete(false), chunkGenerated(false), chunkSize(32768),
 				 chunkedBodyStartSentBytes(0), chunkedBodyEndSentBytes(0), chunksRemaining(0), sendingEndChunk(false)
 	{
@@ -111,6 +116,7 @@ protected:
 	void printTestCard(TestCase &config);
 	void actServerResponse(TestCase &config);
 	void RunTestCase(TestCase &config);
+	void RunStreamingTestCase(TestCase &config);
 	bool SendRequestToServer(TestCase &config);
 	bool ReadResponseFromServer(TestCase &config);
 	void RunForkChildTestCase(TestCase &config);
