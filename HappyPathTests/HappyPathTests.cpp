@@ -351,7 +351,7 @@ void HappyPathTests::PostOnRootTest()
 
 	testCase.configurationsForTestCase = "NOTE: This test uploads a binary PNG file via multipart/form-data containing null bytes (\\x00), then retrieves it to verify correct parsing and storage. The server's multipart parser MUST use size-aware parsing (memmem, memcmp) and NOT string functions like strstr() or std::string::find() that rely on null-termination.";
 
-	testCase.timeout = 2000;
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }

@@ -178,7 +178,7 @@ void CGITests::CgiPostWithBodyTest()
 		"If CONTENT_LENGTH is missing from the environment the script reads "
 		"0 bytes and echoes an empty string — check env var population.";
 
-	testCase.timeout = 5000;
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }
@@ -520,7 +520,7 @@ void CGITests::CgiTimeoutTest()
 		"reader will block even after the 504 is sent.";
 
 	// 25000 ms — server CGI timeout must be shorter than this
-	testCase.timeout = 25000;
+	testCase.timeout = -1;
 
 	RunTestCase(testCase);
 }

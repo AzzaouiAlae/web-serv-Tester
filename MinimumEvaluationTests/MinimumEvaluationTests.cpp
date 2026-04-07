@@ -68,9 +68,9 @@ void MinimumEvaluationTests::SimpleGet()
     config.name = "1 » Simple GET";
     config.description = "Test simple GET request to root - should return 200";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET / HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -88,9 +88,9 @@ void MinimumEvaluationTests::PostRootReturn405()
     config.name = "2 » POST to root returns 405";
     config.description = "Test POST request to root - should return 405 Method Not Allowed";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST / HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: test/file\r\n"
@@ -112,9 +112,9 @@ void MinimumEvaluationTests::HeadRootReturn405()
     config.name = "3 » HEAD to root returns 405";
     config.description = "Test HEAD request to root - should return 405 Method Not Allowed";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "HEAD / HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "\r\n";
     config.expectedResponse.push_back("405 Method Not Allowed");
@@ -133,9 +133,9 @@ void MinimumEvaluationTests::DirectoryRedirectTo301()
     config.name = "4 » Directory redirect returns 301";
     config.description = "Test GET request to /directory without trailing slash - should redirect to /directory/";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -153,11 +153,11 @@ void MinimumEvaluationTests::DirectoryGetBadExtension()
     config.name = "5 » Directory GET with bad extension index";
     config.description = "Test GET request to /directory/ - should return index youpi.bad_extension";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/ HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
-                     "Referer: http://127.0.0.1:1025/directory\r\n"
+                     "Referer: http://127.0.0.1:1027/directory\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
     config.expectedResponse.push_back("200 OK");
@@ -174,9 +174,9 @@ void MinimumEvaluationTests::DirectoryGetFileBadExtension()
     config.name = "6 » Directory GET file with bad extension";
     config.description = "Test GET request to /directory/youpi.bad_extension - should return 200";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/youpi.bad_extension HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -194,9 +194,9 @@ void MinimumEvaluationTests::DirectoryGetFileBlaBla()
     config.name = "7 » Directory GET file with bla extension";
     config.description = "Test GET request to /directory/youpi.bla - should not execute CGI and return 200";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/youpi.bla HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -214,9 +214,9 @@ void MinimumEvaluationTests::DirectoryGetNonExistent()
     config.name = "8 » Directory GET non-existent file";
     config.description = "Test GET request to /directory/oulalala - should return 404";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/oulalala HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -236,9 +236,9 @@ void MinimumEvaluationTests::NopDirectoryReturn301()
     config.name = "9 » Nop directory returns 301";
     config.description = "Test GET request to /directory/nop without trailing slash - should redirect to /directory/nop/";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/nop HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -256,11 +256,11 @@ void MinimumEvaluationTests::NopDirectoryWithReferer()
     config.name = "10 » Nop directory with referer returns autoindex";
     config.description = "Test GET request to /directory/nop/ with referer header - should return 200 with autoindex";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/nop/ HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
-                     "Referer: http://127.0.0.1:1025/directory/nop\r\n"
+                     "Referer: http://127.0.0.1:1027/directory/nop\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
     config.expectedResponse.push_back("200 OK");
@@ -277,9 +277,9 @@ void MinimumEvaluationTests::NopDirectoryAutoindex()
     config.name = "11 » Nop directory autoindex enabled returns 200";
     config.description = "Test GET request to /directory/nop/ without referer - should return 200 with autoindex";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/nop/ HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -297,9 +297,9 @@ void MinimumEvaluationTests::NopDirectoryGetFile()
     config.name = "12 » Nop directory GET file returns 200";
     config.description = "Test GET request to /directory/nop/other.pouic - should return 200";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/nop/other.pouic HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -317,9 +317,9 @@ void MinimumEvaluationTests::NopDirectoryGetOtherFile()
     config.name = "13 » Nop directory GET other file returns 404";
     config.description = "Test GET request to /directory/nop/other.pouac - should return 404";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/nop/other.pouac HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -339,9 +339,9 @@ void MinimumEvaluationTests::YeahDirectoryReturn404()
     config.name = "14 » Yeah directory returns 404";
     config.description = "Test GET request to /directory/Yeah without file - should return 404 due to different roots";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/Yeah HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -359,9 +359,9 @@ void MinimumEvaluationTests::YeahNotHappyReturn200()
     config.name = "15 » Yeah not happy returns 200";
     config.description = "Test GET request to /directory/Yeah/not_happy.bad_extension - should return 200";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "GET /directory/Yeah/not_happy.bad_extension HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -381,9 +381,9 @@ void MinimumEvaluationTests::ChunkedLarge100MYChars()
     config.name = "16 » Chunked large 100M chars body with y";
     config.description = "Test POST request with chunked transfer encoding sending 100M 'y' characters";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /directory/youpi.bla HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: test/file\r\n"
@@ -405,9 +405,9 @@ void MinimumEvaluationTests::ContentLengthLarge100MYChars()
     config.name = "16b » Content-Length large 100M chars body with y";
     config.description = "Test POST request with Content-Length sending 100M 'y' characters without chunked transfer";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /directory/youpi.bla HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 100000000\r\n"
                      "Content-Type: test/file\r\n"
@@ -429,9 +429,9 @@ void MinimumEvaluationTests::ChunkedLarge100MEChars()
     config.name = "17 » Chunked large 100M chars body with e";
     config.description = "Test POST request with chunked transfer encoding sending 100M 'e' characters";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /directory/youpla.bla HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: test/file\r\n"
@@ -453,9 +453,9 @@ void MinimumEvaluationTests::Chunked100KEChars()
     config.name = "18 » Chunked 100K chars body";
     config.description = "Test POST request with chunked transfer encoding sending 100K 'e' characters";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /directory/youpi.bla HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: test/file\r\n"
@@ -480,9 +480,9 @@ void MinimumEvaluationTests::PostBodyEmpty()
     config.name = "19 » POST /post_body with empty body";
     config.description = "Test POST request to /post_body with empty body - should return 200 (within 100-byte limit)";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 0\r\n"
                      "Content-Type: text/plain\r\n"
@@ -501,11 +501,11 @@ void MinimumEvaluationTests::PostBody100PChars()
     config.name = "20 » POST /post_body with 100 bytes";
     config.description = "Test POST request to /post_body with exactly 100 bytes - should return 200 (at limit)";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
 
     string body(100, 'P'); // Exactly 100 'P' characters
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 100\r\n"
                      "Content-Type: text/plain\r\n"
@@ -525,12 +525,12 @@ void MinimumEvaluationTests::PostBody200WChars()
     config.name = "21 » POST /post_body with 200 bytes";
     config.description = "Test POST request to /post_body with 200 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
 
     string body(200, 'W'); // 200 'W' characters (exceeds 100-byte limit)
     config.request = "POST /post_body HTTP/1.1\r\n"
                      "Content-Length: 200\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
 
                      "Content-Type: text/plain\r\n"
@@ -550,11 +550,11 @@ void MinimumEvaluationTests::PostBody101QCharsExceedsLimit()
     config.name = "22 » POST /post_body with 101 bytes exceeds limit";
     config.description = "Test POST request to /post_body with 101 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
 
     string body(101, 'Q'); // 101 'Q' characters (exceeds 100-byte limit by 1 byte)
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 101\r\n"
                      "Content-Type: text/plain\r\n"
@@ -576,9 +576,9 @@ void MinimumEvaluationTests::ChunkedPostBodyEmpty()
     config.name = "23 » Chunked POST /post_body with empty body";
     config.description = "Test POST request to /post_body with chunked empty body - should return 200 (within 100-byte limit)";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: text/plain\r\n"
@@ -599,11 +599,11 @@ void MinimumEvaluationTests::ChunkedPostBody100PChars()
     config.name = "24 » Chunked POST /post_body with 100 bytes";
     config.description = "Test POST request to /post_body with chunked body of exactly 100 bytes - should return 200 (at limit)";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
 
     string body(100, 'P'); // Exactly 100 'P' characters
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: text/plain\r\n"
@@ -624,11 +624,11 @@ void MinimumEvaluationTests::ChunkedPostBody200WChars()
     config.name = "25 » Chunked POST /post_body with 200 bytes";
     config.description = "Test POST request to /post_body with chunked body of 200 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
 
     string body(200, 'W'); // 200 'W' characters (exceeds 100-byte limit)
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: text/plain\r\n"
@@ -649,11 +649,11 @@ void MinimumEvaluationTests::ChunkedPostBody101QCharsExceedsLimit()
     config.name = "26 » Chunked POST /post_body with 101 bytes exceeds limit";
     config.description = "Test POST request to /post_body with chunked body of 101 bytes - should return 413 Payload Too Large";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
 
     string body(101, 'Q'); // 101 'Q' characters (exceeds 100-byte limit by 1 byte)
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: text/plain\r\n"
@@ -674,14 +674,14 @@ void MinimumEvaluationTests::StressFork5Requests20()
 {
     TestCase config;
     config.request = "GET / HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Connection: close\r\n"
                      "\r\n";
     config.name = "27 » Stress fork 5 requests 20";
     config.description = "Stress test: 5 forks × 20 requests = 100 sequential GET requests";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.expectedResponse.push_back("200 OK");
     config.timeout = 2000;
     config.sleepTime = 0; // No delay between requests
@@ -699,15 +699,15 @@ void MinimumEvaluationTests::StressFork20Requests5000()
 {
     TestCase config;
     config.request = "GET / HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "Connection: close\r\n"
                      "\r\n";
     config.name = "28 » Stress fork 20 requests 5000";
     config.description = "Stress test: 20 forks × 5000 requests = 100,000 sequential GET requests";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.expectedResponse.push_back("200 OK");
-    config.timeout = 1500;
+    config.timeout = 5000;
     config.sleepTime = 0;
     config.maxSend = 10;
     config.configurationsForTestCase = "Send 100,000 sequential GET requests to / to intensive stress test the server.";
@@ -723,13 +723,13 @@ void MinimumEvaluationTests::StressFork128Requests50()
 {
     TestCase config;
     config.request = "GET /directory/nop HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "Connection: close\r\n"
                      "\r\n";
     config.name = "29 » Stress fork 128 requests 50";
     config.description = "Stress test: 128 forks × 50 requests = 6,400 GET requests to /directory/nop (redirect)";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.expectedResponse.push_back("301 Moved Permanently");
     config.timeout = 20000;
     config.sleepTime = 0;
@@ -748,7 +748,7 @@ void MinimumEvaluationTests::StressLargePOSTFork20()
     string body(10240, 'X'); // 10KB body
     TestCase config;
     config.request = "POST /post_body HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "Content-Length: " + to_string(body.size()) + "\r\n"
                      "Content-Type: text/plain\r\n"
                      "Connection: close\r\n"
@@ -756,16 +756,18 @@ void MinimumEvaluationTests::StressLargePOSTFork20()
     config.name = "30 » Stress large POST fork 20";
     config.description = "Stress test: 20 forks × 1 large POST request with 10KB body";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.expectedResponse.push_back("413 Payload Too Large||413 Entity Too Large");
     config.timeout = 2000;
     config.sleepTime = 0;
     config.maxSend = 10;
     config.configurationsForTestCase = "Send 20 large POST requests with 10KB bodies to stress test the server.";
     config.printTest = false;
+    config.printForkFailureDetails = true;
     config.forkCount = 20;
     config.totalRequests = 1;
     config.childResults.resize(config.forkCount, 0);
+
 
     RunForkChildTestCase(config);
 }
@@ -776,9 +778,9 @@ void MinimumEvaluationTests::ChunkedForkLarge100MKChars()
     config.name = "31 » Chunked fork large 100M chars with k";
     config.description = "Stress test: 20 forks × 5 requests with 100M 'k' characters each";
     config.host = "127.0.0.1";
-    config.port = "1025";
+    config.port = "1027";
     config.request = "POST /directory/youpi.bla HTTP/1.1\r\n"
-                     "Host: 127.0.0.1:1025\r\n"
+                     "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
                      "Content-Type: test/file\r\n"

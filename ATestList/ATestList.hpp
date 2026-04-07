@@ -27,9 +27,11 @@ struct TestCase
 	size_t headerLength;
 	bool passed;
 	bool printTest;
+	bool printForkFailureDetails;
 	int sleepTime;
 	size_t maxSend;
 	int pipeFd[2];
+	int detailPipeFd[2];
 	vector<pid_t> childPids;
 	vector<int> childResults;
 	bool parentProcess;
@@ -52,7 +54,7 @@ struct TestCase
 	bool sendingEndChunk;
 	bool isSubTest;
 	int childIndex; // For tracking which child process is sending in forked tests
-	TestCase() : sendedBytes(0), streamedResponseBodyBytes(0), streamedRequestPayloadSize(0), streamedRequestHeaderSize(0), streamedResponseHeaderSize(0), passed(false), printTest(true), bodyGeneratedBytes(0), bodyTotalSize(0),
+	TestCase() : sendedBytes(0), streamedResponseBodyBytes(0), streamedRequestPayloadSize(0), streamedRequestHeaderSize(0), streamedResponseHeaderSize(0), passed(false), printTest(true), printForkFailureDetails(false), bodyGeneratedBytes(0), bodyTotalSize(0),
 				 isBodyGenerationComplete(false), chunkGenerated(false), chunkSize(32768),
 				 chunkedBodyStartSentBytes(0), chunkedBodyEndSentBytes(0), chunksRemaining(0), sendingEndChunk(false)
 	{
@@ -60,6 +62,10 @@ struct TestCase
 		contentLength = -1;
 		headerLength = -1;
 		socketIO = NULL;
+		pipeFd[0] = -1;
+		pipeFd[1] = -1;
+		detailPipeFd[0] = -1;
+		detailPipeFd[1] = -1;
 		parentProcess = true;
 		childIndex = -1;
 		isSubTest = false;

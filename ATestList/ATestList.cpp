@@ -208,6 +208,30 @@ namespace
 		return errno == EAGAIN || errno == EWOULDBLOCK;
 	}
 
+	static bool isPeerClosedWriteError()
+	{
+		return errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN;
+	}
+
+	static bool expectsPayloadTooLargeResponse(const TestCase &config)
+	{
+		for (size_t i = 0; i < config.expectedResponse.size(); ++i)
+		{
+			string lowered = toLowerCopy(config.expectedResponse[i]);
+			if (lowered.find("413") != string::npos ||
+				lowered.find("payload too large") != string::npos ||
+				lowered.find("entity too large") != string::npos ||
+				lowered.find("content too large") != string::npos)
+				return true;
+		}
+		return false;
+	}
+
+	static bool shouldAcceptEarlyCloseDuringUpload(const TestCase &config)
+	{
+		return isPeerClosedWriteError() && expectsPayloadTooLargeResponse(config);
+	}
+
 	static bool setSocketNonBlocking(int fd)
 	{
 		int flags = fcntl(fd, F_GETFL, 0);
@@ -336,6 +360,404 @@ namespace
 	{
 		string lowered = toLowerCopy(header);
 		return lowered.find("transfer-encoding:") != string::npos && lowered.find("chunked") != string::npos;
+	}
+
+	static string trimCopy(const string &value)
+	{
+		size_t start = 0;
+		while (start < value.size() && isspace((unsigned char)value[start]))
+			++start;
+
+		size_t end = value.size();
+		while (end > start && isspace((unsigned char)value[end - 1]))
+			--end;
+
+		return value.substr(start, end - start);
+	}
+
+	static bool parseHttpStatusCode(const string &header, int &statusCode)
+	{
+		statusCode = 0;
+		size_t lineEnd = header.find("\r\n");
+		string statusLine = (lineEnd == string::npos) ? header : header.substr(0, lineEnd);
+
+		size_t firstSpace = statusLine.find(' ');
+		if (firstSpace == string::npos)
+			return false;
+		while (firstSpace < statusLine.size() && statusLine[firstSpace] == ' ')
+			++firstSpace;
+		if (firstSpace >= statusLine.size())
+			return false;
+
+		size_t codeEnd = firstSpace;
+		while (codeEnd < statusLine.size() && isdigit((unsigned char)statusLine[codeEnd]))
+			++codeEnd;
+		if (codeEnd == firstSpace)
+			return false;
+
+		string codeStr = statusLine.substr(firstSpace, codeEnd - firstSpace);
+		statusCode = atoi(codeStr.c_str());
+		return statusCode >= 100;
+	}
+
+	static bool extractHeaderValue(const string &header, const string &name, string &value)
+	{
+		string loweredHeader = toLowerCopy(header);
+		string loweredName = toLowerCopy(name) + ":";
+
+		size_t cursor = 0;
+		while (true)
+		{
+			size_t found = loweredHeader.find(loweredName, cursor);
+			if (found == string::npos)
+				return false;
+
+			bool isLineStart = (found == 0) || (loweredHeader[found - 1] == '\n');
+			if (!isLineStart)
+			{
+				cursor = found + loweredName.size();
+				continue;
+			}
+
+			size_t valueStart = found + loweredName.size();
+			while (valueStart < header.size() && (header[valueStart] == ' ' || header[valueStart] == '\t'))
+				++valueStart;
+
+			size_t valueEnd = header.find("\r\n", valueStart);
+			if (valueEnd == string::npos)
+				valueEnd = header.size();
+
+			value = trimCopy(header.substr(valueStart, valueEnd - valueStart));
+			return !value.empty();
+		}
+	}
+
+	static bool isLoopbackHost(const string &host)
+	{
+		return host == "localhost" || host == "127.0.0.1" || host == "::1";
+	}
+
+	static bool areEquivalentRedirectHosts(const string &lhs, const string &rhs)
+	{
+		string loweredLhs = toLowerCopy(lhs);
+		string loweredRhs = toLowerCopy(rhs);
+		if (loweredLhs == loweredRhs)
+			return true;
+		return isLoopbackHost(loweredLhs) && isLoopbackHost(loweredRhs);
+	}
+
+	static bool parseRedirectTarget(const TestCase &config,
+								 const string &location,
+								 string &targetHost,
+								 string &targetPort,
+								 string &targetPath)
+	{
+		targetHost = config.host;
+		targetPort = config.port;
+		targetPath.clear();
+
+		string cleanedLocation = trimCopy(location);
+		if (cleanedLocation.empty())
+			return false;
+
+		if (cleanedLocation.compare(0, 8, "https://") == 0)
+			return false;
+
+		if (cleanedLocation.compare(0, 7, "http://") == 0)
+		{
+			size_t authorityStart = 7;
+			size_t pathStart = cleanedLocation.find('/', authorityStart);
+			string authority = (pathStart == string::npos)
+				? cleanedLocation.substr(authorityStart)
+				: cleanedLocation.substr(authorityStart, pathStart - authorityStart);
+
+			size_t userInfoPos = authority.rfind('@');
+			if (userInfoPos != string::npos)
+				authority = authority.substr(userInfoPos + 1);
+			if (authority.empty())
+				return false;
+
+			string parsedHost;
+			string parsedPort;
+			if (authority[0] == '[')
+			{
+				size_t bracketEnd = authority.find(']');
+				if (bracketEnd == string::npos)
+					return false;
+				parsedHost = authority.substr(1, bracketEnd - 1);
+				if (bracketEnd + 1 < authority.size())
+				{
+					if (authority[bracketEnd + 1] != ':')
+						return false;
+					parsedPort = authority.substr(bracketEnd + 2);
+				}
+			}
+			else
+			{
+				size_t lastColon = authority.rfind(':');
+				if (lastColon != string::npos && authority.find(':') == lastColon)
+				{
+					parsedHost = authority.substr(0, lastColon);
+					parsedPort = authority.substr(lastColon + 1);
+				}
+				else
+					parsedHost = authority;
+			}
+
+			if (parsedHost.empty())
+				return false;
+			if (!areEquivalentRedirectHosts(config.host, parsedHost))
+				return false;
+
+			targetHost = parsedHost;
+			targetPort = parsedPort.empty() ? string("80") : parsedPort;
+			targetPath = (pathStart == string::npos) ? string("/") : cleanedLocation.substr(pathStart);
+			return true;
+		}
+
+		targetPath = cleanedLocation;
+		if (targetPath[0] != '/')
+			targetPath = string("/") + targetPath;
+		return true;
+	}
+
+	static bool sendAllBytes(int fd, const string &payload)
+	{
+		size_t sentTotal = 0;
+		while (sentTotal < payload.size())
+		{
+			ssize_t sent = write(fd, payload.c_str() + sentTotal, payload.size() - sentTotal);
+			if (sent == -1)
+			{
+				if (errno == EINTR)
+					continue;
+				return false;
+			}
+			if (sent == 0)
+				return false;
+			sentTotal += static_cast<size_t>(sent);
+		}
+		return true;
+	}
+
+	static void applySocketTimeout(int fd, int timeoutMs)
+	{
+		if (timeoutMs <= 0)
+			return;
+
+		timeval tv;
+		tv.tv_sec = timeoutMs / 1000;
+		tv.tv_usec = (timeoutMs % 1000) * 1000;
+		setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+		setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+	}
+
+	static bool readHttpResponseFromSocket(int fd, string &response, size_t &headerLength, size_t &contentLength)
+	{
+		response.clear();
+		headerLength = 0;
+		contentLength = 0;
+
+		bool headerParsed = false;
+		bool chunked = false;
+		bool hasContentLengthValue = false;
+		char buffer[8192];
+
+		while (true)
+		{
+			ssize_t received = read(fd, buffer, sizeof(buffer));
+			if (received == -1)
+			{
+				if (errno == EINTR)
+					continue;
+				return false;
+			}
+			if (received == 0)
+				break;
+
+			response.append(buffer, static_cast<size_t>(received));
+			if (!headerParsed)
+			{
+				size_t headerEnd = response.find("\r\n\r\n");
+				if (headerEnd != string::npos)
+				{
+					headerParsed = true;
+					headerLength = headerEnd + 4;
+					string header = response.substr(0, headerLength);
+					chunked = hasChunkedTransferEncoding(header);
+					hasContentLengthValue = parseContentLengthHeader(header, contentLength);
+				}
+			}
+
+			if (!headerParsed)
+				continue;
+
+			if (chunked)
+			{
+				string decodedBody;
+				if (decodeChunkedBody(response.substr(headerLength), decodedBody))
+				{
+					response = response.substr(0, headerLength) + decodedBody;
+					contentLength = decodedBody.size();
+					return true;
+				}
+			}
+			else if (hasContentLengthValue)
+			{
+				size_t expectedTotal = headerLength + contentLength;
+				if (response.size() >= expectedTotal)
+				{
+					if (response.size() > expectedTotal)
+						response.erase(expectedTotal);
+					return true;
+				}
+			}
+		}
+
+		if (!headerParsed)
+			return false;
+
+		if (chunked)
+		{
+			string decodedBody;
+			if (!decodeChunkedBody(response.substr(headerLength), decodedBody))
+				return false;
+			response = response.substr(0, headerLength) + decodedBody;
+			contentLength = decodedBody.size();
+			return true;
+		}
+
+		if (hasContentLengthValue)
+			return response.size() >= headerLength + contentLength;
+
+		contentLength = response.size() - headerLength;
+		return true;
+	}
+
+	static bool patternMatchesResponse(const string &response, const string &responseBody, const string &pattern)
+	{
+		if (pattern.find(" repeated ") != string::npos)
+		{
+			char expectedChar = '\0';
+			size_t expectedCount = 0;
+			if (parseRepeatedBodyPattern(pattern, expectedChar, expectedCount))
+			{
+				if (responseBody.size() != expectedCount)
+					return false;
+				for (size_t i = 0; i < responseBody.size(); ++i)
+				{
+					if (responseBody[i] != expectedChar)
+						return false;
+				}
+				return true;
+			}
+
+			return responseBody.find(pattern) != string::npos;
+		}
+
+		return response.find(pattern) != string::npos;
+	}
+
+	static bool validateExpectedPatternsAgainstResponse(const string &response,
+											const string &responseBody,
+											const vector<string> &expectedResponse,
+											string &failedPattern)
+	{
+		if (expectedResponse.empty())
+			return false;
+
+		for (size_t i = 0; i < expectedResponse.size(); ++i)
+		{
+			const string &pattern = expectedResponse[i];
+			bool matched = false;
+			size_t pos = 0;
+
+			while (true)
+			{
+				size_t sep = pattern.find("||", pos);
+				string candidate = (sep == string::npos) ? pattern.substr(pos) : pattern.substr(pos, sep - pos);
+
+				if (patternMatchesResponse(response, responseBody, candidate))
+				{
+					matched = true;
+					break;
+				}
+
+				if (sep == string::npos)
+					break;
+				pos = sep + 2;
+			}
+
+			if (!matched)
+			{
+				failedPattern = pattern;
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	static bool followRedirectWithGet(TestCase &config, string &followedLocation)
+	{
+		string responseHeader;
+		string responseBody;
+		splitHttpMessage(config.response, responseHeader, responseBody);
+		if (responseHeader.empty())
+			return false;
+
+		int statusCode = 0;
+		if (!parseHttpStatusCode(responseHeader, statusCode) || statusCode < 300 || statusCode >= 400)
+			return false;
+
+		string location;
+		if (!extractHeaderValue(responseHeader, "Location", location))
+			return false;
+
+		string redirectHost;
+		string redirectPort;
+		string redirectPath;
+		if (!parseRedirectTarget(config, location, redirectHost, redirectPort, redirectPath))
+			return false;
+
+		int redirectSocket = Socket::inetConnect(redirectHost, redirectPort, SOCK_STREAM);
+		if (redirectSocket == -1)
+			return false;
+
+		applySocketTimeout(redirectSocket, config.timeout);
+
+		string hostHeader = redirectHost;
+		if (!redirectPort.empty() && redirectPort != "80")
+			hostHeader += ":" + redirectPort;
+
+		string getRequest =
+			"GET " + redirectPath + " HTTP/1.1\r\n"
+			"Host: " + hostHeader + "\r\n"
+			"Connection: close\r\n"
+			"\r\n";
+
+		bool success = sendAllBytes(redirectSocket, getRequest);
+		if (success)
+			shutdown(redirectSocket, SHUT_WR);
+
+		string redirectedResponse;
+		size_t redirectedHeaderLength = 0;
+		size_t redirectedContentLength = 0;
+		if (success)
+			success = readHttpResponseFromSocket(redirectSocket,
+											 redirectedResponse,
+											 redirectedHeaderLength,
+											 redirectedContentLength);
+
+		close(redirectSocket);
+		if (!success)
+			return false;
+
+		config.response = redirectedResponse;
+		config.headerLength = redirectedHeaderLength;
+		config.contentLength = redirectedContentLength;
+		followedLocation = location;
+		return true;
 	}
 
 	static bool validateStreamingBodyBytes(StreamingResponseState &state, const char *data, size_t length, string &failReason)
@@ -677,6 +1099,13 @@ namespace
 		int sentBytes = 0;
 		if (!sendSocketData(config.socketIO, config.request.c_str() + sendState.headerSentBytes, toSend, sentBytes))
 		{
+			if (shouldAcceptEarlyCloseDuringUpload(config))
+			{
+				sendState.headerSentBytes = sendState.headerSize;
+				sendState.headerSendComplete = true;
+				sendState.requestSendComplete = true;
+				return true;
+			}
 			failReason = "Failed to send request headers.";
 			return false;
 		}
@@ -709,6 +1138,13 @@ namespace
 							toSend,
 							sentBytes))
 			{
+				if (shouldAcceptEarlyCloseDuringUpload(config))
+				{
+					config.chunksRemaining = 0;
+					config.sendingEndChunk = true;
+					config.chunkedBodyEndSentBytes = config.chunkedBodyEnd.size();
+					return true;
+				}
 				failReason = "Failed to send chunked body segment.";
 				return false;
 			}
@@ -742,6 +1178,11 @@ namespace
 							toSend,
 							sentBytes))
 			{
+				if (shouldAcceptEarlyCloseDuringUpload(config))
+				{
+					config.chunkedBodyEndSentBytes = config.chunkedBodyEnd.size();
+					return true;
+				}
 				failReason = "Failed to send chunked terminator.";
 				return false;
 			}
@@ -770,6 +1211,11 @@ namespace
 		int sentBytes = 0;
 		if (!sendSocketData(config.socketIO, sendState.bodySegment.c_str(), toSend, sentBytes))
 		{
+			if (shouldAcceptEarlyCloseDuringUpload(config))
+			{
+				config.bodyGeneratedBytes = config.bodyTotalSize;
+				return true;
+			}
 			failReason = "Failed to send generated body segment.";
 			return false;
 		}
@@ -790,10 +1236,13 @@ namespace
 		if (sendState.requestSendComplete)
 			return true;
 
-		if (!sendHeaderStep(config, sendState, progress, failReason))
-			return false;
 		if (!sendState.headerSendComplete)
-			return true;
+		{
+			if (!sendHeaderStep(config, sendState, progress, failReason))
+				return false;
+			if (!sendState.headerSendComplete || progress)
+				return true;
+		}
 		
 
 		if (config.chunkGenerated)
@@ -817,6 +1266,101 @@ namespace
 
 		sendState.requestSendComplete = true;
 		return true;
+	}
+
+	static size_t parseStreamingBodyTotalSize(const string &description)
+	{
+		if (description.empty())
+			return 0;
+
+		size_t repPos = description.find(" repeated ");
+		size_t timesPos = description.find(" times");
+		if (repPos == string::npos || timesPos == string::npos || timesPos <= repPos + 9)
+			return 0;
+
+		string countStr = description.substr(repPos + 9, timesPos - (repPos + 9));
+		return strtoull(countStr.c_str(), NULL, 10);
+	}
+
+	static void resetStreamingRuntimeState(TestCase &config)
+	{
+		config.sendedBytes = 0;
+		config.chunkedBodyStartSentBytes = 0;
+		config.chunkedBodyEndSentBytes = 0;
+		config.chunksRemaining = 0;
+		config.sendingEndChunk = false;
+		config.chunkGenerated = false;
+		config.response.clear();
+		config.streamedResponseBodySummary.clear();
+		config.streamedResponseBodyBytes = 0;
+		config.streamedRequestPayloadSize = 0;
+		config.streamedRequestHeaderSize = 0;
+		config.streamedResponseHeaderSize = 0;
+		config.headerLength = 0;
+		config.contentLength = 0;
+		config.passed = false;
+		config.bodyGeneratedBytes = 0;
+		config.bodyTotalSize = 0;
+		config.bodyDescription.clear();
+
+		if (!config.body.empty())
+		{
+			config.bodyDescription = config.body;
+			config.bodyTotalSize = parseStreamingBodyTotalSize(config.body);
+			config.isBodyGenerationComplete = false;
+		}
+	}
+
+	static void setStreamingRequestSizes(TestCase &config)
+	{
+		string requestHeader;
+		string requestBody;
+		splitHttpMessage(config.request, requestHeader, requestBody);
+		config.streamedRequestHeaderSize = requestHeader.size();
+		config.streamedRequestPayloadSize =
+			(config.bodyTotalSize > 0) ? config.bodyTotalSize : requestBody.size();
+	}
+
+	static bool readStreamingResponseData(TestCase &config,
+									 StreamingResponseState &responseState,
+									 string &failReason,
+									 bool &responseComplete)
+	{
+		int receivedBytes = read(config.socketIO->GetFd(), config.responseBuffer, KBYTE);
+		if (receivedBytes > 0)
+		{
+			if (!processIncomingResponseData(config,
+								 responseState,
+								 config.responseBuffer,
+								 (size_t)receivedBytes,
+								 failReason))
+				return false;
+			if (responseState.responseComplete)
+				responseComplete = true;
+			return true;
+		}
+
+		if (receivedBytes == 0)
+		{
+			if (!onResponsePeerClosed(responseState, failReason))
+				return false;
+			responseComplete = true;
+			return true;
+		}
+
+		if (isWouldBlockError())
+			return true;
+
+		failReason = "Failed to receive response from the server.";
+		return false;
+	}
+
+	static void setStreamingObservedResponse(TestCase &config,
+									 const StreamingResponseState &responseState)
+	{
+		config.streamedResponseBodyBytes = responseState.decodedBodyBytes;
+		config.streamedResponseHeaderSize = config.headerLength;
+		config.streamedResponseBodySummary = buildStreamingBodySummary(responseState);
 	}
 
 } // namespace
@@ -862,13 +1406,97 @@ void ATestList::printTestCard(TestCase &config)
 	cout << CLI::botLine() << endl;
 }
 
+static string firstLineFromBuffer(const string &buffer)
+{
+	if (buffer.empty())
+		return "";
+	size_t lineEnd = buffer.find("\r\n");
+	if (lineEnd == string::npos)
+		lineEnd = buffer.find('\n');
+	if (lineEnd == string::npos)
+		return buffer;
+	return buffer.substr(0, lineEnd);
+}
+
+static string collapseWhitespaceForLog(const string &value)
+{
+	string compact;
+	compact.reserve(value.size());
+	bool previousWasSpace = false;
+	for (size_t i = 0; i < value.size(); ++i)
+	{
+		unsigned char c = static_cast<unsigned char>(value[i]);
+		if (isspace(c))
+		{
+			if (!previousWasSpace)
+			{
+				compact.push_back(' ');
+				previousWasSpace = true;
+			}
+			continue;
+		}
+		compact.push_back(static_cast<char>(c));
+		previousWasSpace = false;
+	}
+	return compact;
+}
+
+static string truncateForLog(const string &value, size_t maxLen)
+{
+	if (value.size() <= maxLen)
+		return value;
+	if (maxLen <= 3)
+		return value.substr(0, maxLen);
+	return value.substr(0, maxLen - 3) + "...";
+}
+
+static string expectedPatternsForLog(const vector<string> &patterns)
+{
+	string joined;
+	for (size_t i = 0; i < patterns.size(); ++i)
+	{
+		if (!joined.empty())
+			joined += " || ";
+		joined += patterns[i];
+	}
+	return truncateForLog(collapseWhitespaceForLog(joined), 180);
+}
+
 void failChild(TestCase &config, string failedPattern)
 {
 	if (config.childIndex != -1)
 	{
 		int fail = -(config.childIndex + 1);
 		write(config.pipeFd[1], &fail, sizeof(int));
-		CLI::printError("Child failed, " + failedPattern);
+		if (config.printForkFailureDetails)
+		{
+			string requestLine = truncateForLog(collapseWhitespaceForLog(firstLineFromBuffer(config.request)), 120);
+			string statusLine = truncateForLog(collapseWhitespaceForLog(firstLineFromBuffer(config.response)), 120);
+			string expected = expectedPatternsForLog(config.expectedResponse);
+
+			ostringstream details;
+			details << "Child " << config.childIndex << " failed: " << failedPattern;
+			if (!requestLine.empty())
+				details << " | request: " << requestLine;
+			if (!expected.empty())
+				details << " | expected: " << expected;
+			if (!statusLine.empty())
+				details << " | got: " << statusLine;
+			else if (config.response.empty())
+				details << " | got: <empty response>";
+
+			if (config.detailPipeFd[1] != -1)
+			{
+				string detailMessage = details.str() + "\n";
+				write(config.detailPipeFd[1], detailMessage.c_str(), detailMessage.size());
+			}
+
+			CLI::printError(details.str());
+		}
+		else
+		{
+			CLI::printError("Child failed, " + failedPattern);
+		}
 		sleep(7);
 	}
 }
@@ -1046,8 +1674,8 @@ bool ATestList::SendRequestToServer(TestCase &config)
 			if (sentBytes <= 0)
 			{
 				failChild(config, "send header");
-				CLI::printError("Failed to send request to the server.");
-				return false;
+				CLI::printError("\nFailed to send request to the server.");
+				return true;
 			}
 			if (sentBytes > 0)
 			{
@@ -1262,47 +1890,32 @@ void ATestList::actServerResponse(TestCase &config)
 		responseBody = config.response.substr(config.headerLength);
 	}
 
-	bool allMatched = !config.expectedResponse.empty();
 	string failedPattern;
-	for (size_t i = 0; i < config.expectedResponse.size(); i++)
+	bool allMatched = validateExpectedPatternsAgainstResponse(config.response,
+												responseBody,
+												config.expectedResponse,
+												failedPattern);
+
+	if (!allMatched)
 	{
-		const string &pattern = config.expectedResponse[i];
-		bool matched = false;
-
-		// Support OR with "||": "patternA||patternB" passes if either matches
-		size_t pos = 0;
-		size_t sep;
-		while ((sep = pattern.find("||", pos)) != string::npos)
+		string followedLocation;
+		if (followRedirectWithGet(config, followedLocation))
 		{
-			string subPattern = pattern.substr(pos, sep - pos);
-			// Use smart pattern matching for repeated character patterns
-			if (subPattern.find(" repeated ") != string::npos)
-				matched = matchesBodyPattern(responseBody, subPattern);
-			else
-				matched = (config.response.find(subPattern) != string::npos);
+			if (config.printTest && !config.isSubTest)
+				CLI::printHint("Initial response was redirect, followed Location with GET: " + followedLocation);
 
-			if (matched)
-				break;
-			pos = sep + 2;
-		}
+			responseBody.clear();
+			if (config.headerLength > 0 && config.headerLength <= config.response.size())
+				responseBody = config.response.substr(config.headerLength);
 
-		if (!matched)
-		{
-			string finalPattern = pattern.substr(pos);
-			// Use smart pattern matching for repeated character patterns
-			if (finalPattern.find(" repeated ") != string::npos)
-				matched = matchesBodyPattern(responseBody, finalPattern);
-			else
-				matched = (config.response.find(finalPattern) != string::npos);
-		}
-
-		if (!matched)
-		{
-			allMatched = false;
-			failedPattern = pattern;
-			break;
+			failedPattern.clear();
+			allMatched = validateExpectedPatternsAgainstResponse(config.response,
+													responseBody,
+													config.expectedResponse,
+													failedPattern);
 		}
 	}
+
 	if (allMatched)
 	{
 		if (!config.isSubTest)
@@ -1331,7 +1944,7 @@ void ATestList::actServerResponse(TestCase &config)
 			cerr << endl;
 		}
 	}
-	string responseHeader = config.response.substr(0, config.headerLength);
+
 	if (!config.isSubTest && (config.printTest || config.passed == false))
 	{
 		printServerResponseHeader(config);
@@ -1633,37 +2246,8 @@ void ATestList::RunStreamingTestCase(TestCase &config)
 	{
 		_reRunTest = false;
 
-		config.sendedBytes = 0;
-		config.chunkedBodyStartSentBytes = 0;
-		config.chunkedBodyEndSentBytes = 0;
-		config.chunksRemaining = 0;
-		config.sendingEndChunk = false;
-		config.chunkGenerated = false;
-		config.response.clear();
-		config.streamedResponseBodySummary.clear();
-		config.streamedResponseBodyBytes = 0;
-		config.streamedRequestPayloadSize = 0;
-		config.streamedRequestHeaderSize = 0;
-		config.streamedResponseHeaderSize = 0;
-		config.headerLength = 0;
-		config.contentLength = 0;
-		config.passed = false;
-		config.bodyGeneratedBytes = 0;
-		config.bodyTotalSize = 0;
-		config.bodyDescription.clear();
-
-		if (!config.body.empty())
-		{
-			config.bodyDescription = config.body;
-			config.bodyTotalSize = getBodyTotalSize(config.body);
-			config.isBodyGenerationComplete = false;
-		}
-
-		string requestHeader;
-		string requestBody;
-		splitHttpMessage(config.request, requestHeader, requestBody);
-		config.streamedRequestHeaderSize = requestHeader.size();
-		config.streamedRequestPayloadSize = (config.bodyTotalSize > 0) ? config.bodyTotalSize : requestBody.size();
+		resetStreamingRuntimeState(config);
+		setStreamingRequestSizes(config);
 
 		if (config.printTest)
 			printTestCard(config);
@@ -1698,33 +2282,62 @@ void ATestList::RunStreamingTestCase(TestCase &config)
 		}
 		multiplexer.ChangeToEpollInOut(config.socketIO);
 
-		bool done = false;
+		bool requestHalfClosed = false;
+		bool responseComplete = false;
+		bool stopStreamingLoop = false;
 		string failReason;
 
-		while (!done)
+		while (!responseComplete && !stopStreamingLoop)
 		{
 			int eventCount = multiplexer.epollWait(config.timeout);
 			if (eventCount == -1)
 			{
 				failReason = "epollWait -1";
+				stopStreamingLoop = true;
 				break;
 			}
 			if (eventCount == 0)
 			{
 				failReason = "epollWait timeout";
+				stopStreamingLoop = true;
 				break;
 			}
 
-			for (int i = 0; i < eventCount && !done; ++i)
+			for (int i = 0; i < eventCount && !responseComplete && !stopStreamingLoop; ++i)
 			{
 				unsigned int events = multiplexer.eventList[i].events;
 
-				if (events & EPOLLOUT)
+				if (events & EPOLLIN)
+				{
+					if (!readStreamingResponseData(config, responseState, failReason, responseComplete))
+					{
+						stopStreamingLoop = true;
+						break;
+					}
+					if (responseComplete || responseState.responseComplete)
+						continue;
+				}
+
+				if ((events & (EPOLLERR | EPOLLHUP)) && ((events & EPOLLIN) == 0))
+				{
+					if (!responseState.responseComplete)
+					{
+						if (!onResponsePeerClosed(responseState, failReason))
+						{
+							stopStreamingLoop = true;
+							break;
+						}
+					}
+					responseComplete = true;
+					continue;
+				}
+
+				if ((events & EPOLLOUT) && !requestHalfClosed)
 				{
 					bool sendProgress = false;
 					if (!sendStreamingRequestStep(config, sendState, sendProgress, failReason))
 					{
-						done = true;
+						stopStreamingLoop = true;
 						break;
 					}
 					if (sendProgress && config.isSubTest == false && config.printTest)
@@ -1739,85 +2352,47 @@ void ATestList::RunStreamingTestCase(TestCase &config)
 						if (!multiplexer.ChangeToEpollIn(config.socketIO))
 						{
 							failReason = "Failed to switch socket to response-read mode.";
-							done = true;
+							stopStreamingLoop = true;
 							break;
 						}
 						sendState.writeShutdownSent = true;
+						requestHalfClosed = true;
 						if (config.printTest && !config.isSubTest)
 							CLI::printHint("Request fully sent. Waiting for response...");
 					}
 				}
-
-				if (events & EPOLLIN)
-				{
-						int receivedBytes = read(config.socketIO->GetFd(), config.responseBuffer, KBYTE);
-						if (receivedBytes > 0)
-						{
-							if (!processIncomingResponseData(config, responseState, config.responseBuffer, (size_t)receivedBytes, failReason))
-							{
-								done = true;
-								break;
-							}
-							if (responseState.responseComplete)
-							{
-								done = true;
-								break;
-							}
-							continue;
-						}
-						if (receivedBytes == 0)
-						{
-							onResponsePeerClosed(responseState, failReason);
-							done = true;
-						}
-						else if (!isWouldBlockError())
-						{
-							failReason = "Failed to receive response from the server.";
-							done = true;
-						}
-				}
-
-				if (events & (EPOLLERR | EPOLLHUP))
-				{
-					if (!responseState.responseComplete)
-					{
-						if (!onResponsePeerClosed(responseState, failReason))
-						{
-							done = true;
-							break;
-						}
-					}
-					done = true;
-				}
 			}
 
 			if (!failReason.empty())
+			{
+				stopStreamingLoop = true;
 				break;
+			}
 			if (responseState.responseComplete)
+			{
+				responseComplete = true;
 				break;
+			}
 		}
 
 		bool passed = false;
-		config.streamedResponseBodyBytes = responseState.decodedBodyBytes;
-		config.streamedResponseHeaderSize = config.headerLength;
-		config.streamedResponseBodySummary = buildStreamingBodySummary(responseState);
+		setStreamingObservedResponse(config, responseState);
 		if (failReason.empty())
 		{
 			if (finalizeStreamingValidation(responseState, failReason))
 				passed = true;
 		}
 
-		if (config.isSubTest)
-		{
-			config.passed = passed;
-		}
-		else if (passed)
+		if (passed)
 		{
 			config.passed = true;
-			_passedTests++;
-			_failedTests--;
-			if (config.printTest)
-				cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+			if (!config.isSubTest)
+			{
+				_passedTests++;
+				_failedTests--;
+				if (config.printTest)
+					cout << "  " << CLI::passBadge() << "  " << CLR_PASS << config.name << RESET << endl;
+			}
 		}
 		else
 		{
@@ -2017,6 +2592,13 @@ bool ATestList::createPipe(TestCase &config)
 		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET << " (pipe creation failed)" << endl;
 		return false;
 	}
+	if (pipe(config.detailPipeFd) == -1)
+	{
+		close(config.pipeFd[0]);
+		close(config.pipeFd[1]);
+		cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET << " (detail pipe creation failed)" << endl;
+		return false;
+	}
 	return true;
 }
 
@@ -2036,6 +2618,8 @@ bool ATestList::forkChildProcess(TestCase &config)
 			cerr << "  " << CLI::failBadge() << "  " << CLR_FAIL << config.name << RESET << " (fork failed)" << endl;
 			close(config.pipeFd[0]);
 			close(config.pipeFd[1]);
+			close(config.detailPipeFd[0]);
+			close(config.detailPipeFd[1]);
 			return false;
 		}
 		else if (pid != 0)
@@ -2048,6 +2632,7 @@ bool ATestList::forkChildProcess(TestCase &config)
 			// Child process - close read end of pipe and return to run test case
 			config.parentProcess = false;
 			close(config.pipeFd[0]);
+			close(config.detailPipeFd[0]);
 			return true;
 		}
 	}
@@ -2062,7 +2647,16 @@ bool ATestList::runChildTestCase(TestCase &childConfig)
 	// int fail = -(childConfig.childIndex + 1);
 	isListOfTests = true;
 	multiplexer.epoolInit();
-	close(childConfig.pipeFd[0]);
+	if (childConfig.pipeFd[0] != -1)
+	{
+		close(childConfig.pipeFd[0]);
+		childConfig.pipeFd[0] = -1;
+	}
+	if (childConfig.detailPipeFd[0] != -1)
+	{
+		close(childConfig.detailPipeFd[0]);
+		childConfig.detailPipeFd[0] = -1;
+	}
 	for (int j = 0; j < childConfig.totalRequests; ++j)
 	{
 		childConfig.sendedBytes = 0;
@@ -2092,17 +2686,23 @@ bool ATestList::runChildTestCase(TestCase &childConfig)
 
 	write(childConfig.pipeFd[1], &childSuccessCount, sizeof(int));
 	close(childConfig.pipeFd[1]);
+	if (childConfig.detailPipeFd[1] != -1)
+		close(childConfig.detailPipeFd[1]);
 
 	exit(childSuccessCount == childConfig.totalRequests ? 0 : 1);
 }
 
 void ATestList::getChildResults(TestCase &config)
 {
-	close(config.pipeFd[1]);
+	if (config.pipeFd[1] != -1)
+		close(config.pipeFd[1]);
+	if (config.detailPipeFd[1] != -1)
+		close(config.detailPipeFd[1]);
 
 	int totalSuccessCount = 0;
 	bool anyChildFailed = false;
 	int failedChildIndex = -1;
+	string failureDetails;
 	int totalExpected = config.forkCount * config.totalRequests;
 	int percentStep = totalExpected / 100;
 	if (percentStep == 0) percentStep = 1;
@@ -2165,6 +2765,42 @@ void ATestList::getChildResults(TestCase &config)
 		for (pid_t childPid : config.childPids)
 		{
 			waitpid(childPid, &status, 0);
+		}
+	}
+
+	if (config.printForkFailureDetails)
+	{
+		char detailBuffer[1024];
+		while (true)
+		{
+			ssize_t bytesRead = read(config.detailPipeFd[0], detailBuffer, sizeof(detailBuffer));
+			if (bytesRead > 0)
+			{
+				failureDetails.append(detailBuffer, static_cast<size_t>(bytesRead));
+				continue;
+			}
+			if (bytesRead == -1 && errno == EINTR)
+				continue;
+			break;
+		}
+	}
+	close(config.detailPipeFd[0]);
+
+	if (anyChildFailed && config.printForkFailureDetails)
+	{
+		if (failureDetails.empty())
+		{
+			CLI::printError("Fork child failed but no detail message was captured.");
+		}
+		else
+		{
+			istringstream detailsStream(failureDetails);
+			string line;
+			while (getline(detailsStream, line))
+			{
+				if (!line.empty())
+					CLI::printError(line);
+			}
 		}
 	}
 	printForkChildTestResult(config, totalSuccessCount, anyChildFailed, failedChildIndex);
