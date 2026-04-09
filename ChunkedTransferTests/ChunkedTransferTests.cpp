@@ -781,6 +781,60 @@ void ChunkedTransferTests::SlowUploadByteByByteTest()
 	RunTestCase(testCase);
 }
 
+void ChunkedTransferTests::FakeBoundaryInBodySlowUploadTest()
+{
+	// arrange
+	TestCase testCase;
+	testCase.name = "14.1 » Chunked Multipart Fake Boundary In Body Slow Upload Test";
+	testCase.description = "Send a chunked multipart/form-data upload where the file content contains a fake boundary-like token. Send one byte at a time with a long delay to stress partial upload handling.";
+	testCase.port = "1025";
+	testCase.host = "localhost";
+
+	const string boundary = "FakeBodyBoundary";
+
+	// Build multipart payload with fake boundary text inside file content.
+	// The fake token intentionally starts like the real boundary but has
+	// extra suffix characters, so it must NOT be treated as a delimiter.
+	string seg1 =
+		"--" + boundary + "\r\n"
+		"Content-Disposition: form-data; name=\"file\"; filename=\"fake-boundary.txt\"\r\n"
+		"Content-Type: text/plain\r\n\r\n"
+		"line-1: begin upload\r\n"
+		"line-2: fake token starts here -> \r\n--FakeBodyB";
+
+	string seg2 =
+		"oundaryFAKE <- continues but is not delimiter\r\n"
+		"line-3: parser must ignore fake boundary text\r\n"
+		"--" + boundary + "--\r\n";
+
+	// Split body into two chunks so the fake token itself spans chunk boundaries.
+	string chunkedBody = chunkEncode(seg1) + chunkEncode(seg2) + CHUNK_TERMINATOR;
+
+	testCase.request =
+		"POST /upload HTTP/1.1\r\n"
+		"Host: localhost\r\n"
+		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"Transfer-Encoding: chunked\r\n"
+		"\r\n"
+		+ chunkedBody;
+
+	testCase.expectedResponse.push_back("HTTP/1.1 201 Created||HTTP/1.1 200 OK");
+
+	testCase.configurationsForTestCase =
+		"SETUP: '/upload' route must accept multipart/form-data. "
+		"This test includes a fake boundary-like token ('--FakeBodyBoundaryFAKE') "
+		"inside file content while using Transfer-Encoding: chunked. "
+		"The body is sent one byte per send with a long delay to stress partial "
+		"multipart parsing. The server must ignore fake token text in content and "
+		"only treat exact boundary delimiters as multipart boundaries.";
+
+	testCase.maxSend = 1;
+	testCase.sleepTime = 100000;
+	testCase.timeout = -1;
+
+	RunTestCase(testCase);
+}
+
 void ChunkedTransferTests::PrematureEOFTest()
 {
 	// arrange
@@ -816,6 +870,8 @@ void ChunkedTransferTests::PrematureEOFTest()
 	testCase.configurationsForTestCase = "SETUP: '/upload' route must accept multipart/form-data. This test sends a chunked body that ends before the chunked terminator or chunk data is complete. The server must detect the incomplete body and return 400.";
 
 	testCase.timeout = -1;
+	// testCase.maxSend = 1;
+	// testCase.sleepTime = 200000;
 
 	RunTestCase(testCase);
 }
@@ -936,6 +992,8 @@ void ChunkedTransferTests::ChunkSizeEdgeCasesTest()
 		"is doing a decimal atoi() instead of strtol(base 16).";
 
 	testCase.timeout = 10000;
+
+	
 
 	RunTestCase(testCase);
 }
@@ -1066,6 +1124,7 @@ void ChunkedTransferTests::AddAllTests()
 	_testFunctions.push_back( make_pair("Chunked Binary Data Test", (void (ATestList::*)())&ChunkedTransferTests::BinaryDataTest) );
 	_testFunctions.push_back( make_pair("Chunked Large File Stream Test", (void (ATestList::*)())&ChunkedTransferTests::LargeFileStreamTest) );
 	_testFunctions.push_back( make_pair("Chunked Slow Upload Byte By Byte Test", (void (ATestList::*)())&ChunkedTransferTests::SlowUploadByteByByteTest) );
+	_testFunctions.push_back( make_pair("Chunked Multipart Fake Boundary In Body Slow Upload Test", (void (ATestList::*)())&ChunkedTransferTests::FakeBoundaryInBodySlowUploadTest) );
 	_testFunctions.push_back( make_pair("Chunked Premature EOF Test", (void (ATestList::*)())&ChunkedTransferTests::PrematureEOFTest) );
 	_testFunctions.push_back( make_pair("Chunked Extensions and Trailers Test", (void (ATestList::*)())&ChunkedTransferTests::ChunkExtensionsAndTrailersTest) );
 	_testFunctions.push_back( make_pair("Chunk Size Edge Cases Test",            (void (ATestList::*)())&ChunkedTransferTests::ChunkSizeEdgeCasesTest) );

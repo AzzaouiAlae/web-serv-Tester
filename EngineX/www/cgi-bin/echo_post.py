@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
+import sys
 
-import os, sys
-length = int(os.environ.get('CONTENT_LENGTH', 0))
-body = sys.stdin.read(length) if length > 0 else ''
+# sys.stdin.read() without arguments reads until EOF (stdin closed)
+body = sys.stdin.read()
 
 print('Content-Type: text/plain')
 print('Content-Length: ' + str(len(body)))
-
 print()
 
-print(body)
+sys.stdout.write(body)

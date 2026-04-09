@@ -19,6 +19,7 @@ class ChunkedTransferTests : public ATestList
 	void BinaryDataTest();
 	void LargeFileStreamTest();
 	void SlowUploadByteByByteTest();
+	void FakeBoundaryInBodySlowUploadTest();
 	void PrematureEOFTest();
 	void ChunkExtensionsAndTrailersTest();
 	void ChunkSizeEdgeCasesTest();
