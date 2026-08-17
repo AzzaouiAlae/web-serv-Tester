@@ -184,18 +184,18 @@ void AutoIndexTests::AutoIndexShowsFilesTest()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 4 — autoindex listing has correct Content-Type header
+// Test 4 — autoindex listing has correct content-type header
 // Targets: StaticFile / listing generator, Repsense (MIME type assignment)
 //
 // The generated directory listing is an HTML document — the server must set
-// Content-Type: text/html (with or without a charset parameter).
-// Setting expectedResponse = "Content-Type: text/html" exploits the
-// substring match: "Content-Type: text/html; charset=utf-8" also passes
+// content-type: text/html (with or without a charset parameter).
+// Setting expectedResponse = "content-type: text/html" exploits the
+// substring match: "content-type: text/html; charset=utf-8" also passes
 // because it contains the required prefix.
 //
 // This test catches a bug where the listing is generated correctly but the
 // server assigns no MIME type, a wrong MIME type (e.g. text/plain), or
-// forgets the Content-Type header entirely because the response path for
+// forgets the content-type header entirely because the response path for
 // dynamically generated content is different from the static-file path.
 // ─────────────────────────────────────────────────────────────────────────────
 void AutoIndexTests::AutoIndexContentTypeTest()
@@ -204,7 +204,7 @@ void AutoIndexTests::AutoIndexContentTypeTest()
 	TestCase testCase;
 	testCase.name        = "4 » Auto Index Content Type Test";
 	testCase.description = "Test to check that the autoindex-generated directory "
-	                       "listing response includes a 'Content-Type: text/html' "
+	                       "listing response includes a 'content-type: text/html' "
 	                       "header — confirming the server treats the listing as "
 	                       "an HTML document, not a raw byte stream.";
 	testCase.port        = "1025";
@@ -215,16 +215,16 @@ void AutoIndexTests::AutoIndexContentTypeTest()
 		"Host: localhost\r\n"
 		"\r\n";
 
-	// Matches "Content-Type: text/html" and also "Content-Type: text/html; charset=utf-8"
-	testCase.expectedResponse.push_back("Content-Type: text/html");
+	// Matches "content-type: text/html" and also "content-type: text/html; charset=utf-8"
+	testCase.expectedResponse.push_back("content-type: text/html");
 
 	testCase.configurationsForTestCase =
 		"SETUP: Same '/autoindex-dir/' as Test 1. "
 		"When the server generates a dynamic listing body it must assign the "
-		"MIME type 'text/html' in the Content-Type header, exactly as it would "
+		"MIME type 'text/html' in the content-type header, exactly as it would "
 		"for a static .html file. A common bug is that the static-file MIME "
 		"resolver is bypassed for generated content, resulting in a missing or "
-		"'application/octet-stream' Content-Type. "
+		"'application/octet-stream' content-type. "
 		"CRITICAL: Response must also include 'Content-Length'.";
 
 	testCase.timeout = 3000;

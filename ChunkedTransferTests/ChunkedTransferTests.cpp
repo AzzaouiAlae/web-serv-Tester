@@ -99,7 +99,7 @@ void ChunkedTransferTests::ChunkedPostSimpleTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -164,7 +164,7 @@ void ChunkedTransferTests::ChunkedPostMultiChunkTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -238,7 +238,7 @@ void ChunkedTransferTests::ChunkedBodyEchoedByCgiTest()
 	testCase.request =
 		"POST /cgi-bin/echo_post.py HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -301,7 +301,7 @@ void ChunkedTransferTests::ChunkedBodySizeLimitTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -361,7 +361,7 @@ void ChunkedTransferTests::ChunkedEmptyBodyTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ CHUNK_TERMINATOR;   // "0\r\n\r\n"
@@ -400,7 +400,7 @@ void ChunkedTransferTests::ChunkedMultipartTest()
     std::string multipartData = 
         "--MyBoundary\r\n"
         "Content-Disposition: form-data; name=\"upload\"; filename=\"test.txt\"\r\n"
-        "Content-Type: text/plain\r\n"
+        "content-type: text/plain\r\n"
         "\r\n"
         "Hello from a chunk!\r\n"
         "--MyBoundary--\r\n";
@@ -417,7 +417,7 @@ void ChunkedTransferTests::ChunkedMultipartTest()
         "POST /upload HTTP/1.1\r\n"
         "Host: localhost\r\n"
         // Notice the boundary defined here matches the one in the body
-        "Content-Type: multipart/form-data; boundary=MyBoundary\r\n"
+        "content-type: multipart/form-data; boundary=MyBoundary\r\n"
         "Transfer-Encoding: chunked\r\n"
         "\r\n"
         + chunkedBody;
@@ -428,7 +428,7 @@ void ChunkedTransferTests::ChunkedMultipartTest()
     testCase.configurationsForTestCase =
         "SETUP: Same '/upload' route. "
         "The server must first de-chunk the payload. "
-        "Then, it must recognize the 'multipart/form-data' Content-Type, "
+        "Then, it must recognize the 'multipart/form-data' content-type, "
         "parse the boundary, and extract the file named 'test.txt' "
         "containing the text 'Hello from a chunk!'.";
 
@@ -453,7 +453,7 @@ void ChunkedTransferTests::BoundarySplitAcrossChunksTest()
 	string seg1 = "--MyBou"; // partial boundary (will end a chunk)
 	string seg2 = string("ndary\r\n") +
 				  "Content-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\n" +
-				  "Content-Type: text/plain\r\n\r\n" +
+				  "content-type: text/plain\r\n\r\n" +
 				  "Text for test\r\n" +
 				  "--" + boundary + "--\r\n"; // rest of multipart including closing
 
@@ -463,7 +463,7 @@ void ChunkedTransferTests::BoundarySplitAcrossChunksTest()
 	postCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=MyBoundary\r\n"
+		"content-type: multipart/form-data; boundary=MyBoundary\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -490,12 +490,12 @@ void ChunkedTransferTests::MultiFileUploadTest()
 	// Build multipart body with two file parts
 	string part1 = "--" + boundary + "\r\n";
 	part1 += "Content-Disposition: form-data; name=\"file1\"; filename=\"file1.txt\"\r\n";
-	part1 += "Content-Type: text/plain\r\n\r\n";
+	part1 += "content-type: text/plain\r\n\r\n";
 	part1 += "Content of file one\r\n";
 
 	string part2 = "--" + boundary + "\r\n";
 	part2 += "Content-Disposition: form-data; name=\"file2\"; filename=\"file2.txt\"\r\n";
-	part2 += "Content-Type: text/plain\r\n\r\n";
+	part2 += "content-type: text/plain\r\n\r\n";
 	part2 += "Content of file two\r\n";
 
 	string closing = "--" + boundary + "--\r\n";
@@ -506,7 +506,7 @@ void ChunkedTransferTests::MultiFileUploadTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -540,7 +540,7 @@ void ChunkedTransferTests::MultipleFieldsTest()
 
 	string part3 = "--" + boundary + "\r\n";
 	part3 += "Content-Disposition: form-data; name=\"file\"; filename=\"note.txt\"\r\n";
-	part3 += "Content-Type: text/plain\r\n\r\n";
+	part3 += "content-type: text/plain\r\n\r\n";
 	part3 += "Note contents\r\n";
 
 	string closing = "--" + boundary + "--\r\n";
@@ -551,7 +551,7 @@ void ChunkedTransferTests::MultipleFieldsTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -592,7 +592,7 @@ void ChunkedTransferTests::MalformedBoundaryTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + declaredBoundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + declaredBoundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -600,7 +600,7 @@ void ChunkedTransferTests::MalformedBoundaryTest()
 	// Expect server to error on malformed multipart boundary
 	testCase.expectedResponse.push_back("HTTP/1.1 400 Bad Request||HTTP/1.1 400");
 
-	testCase.configurationsForTestCase = "SETUP: '/upload' route must accept multipart/form-data. This test sends a body whose delimiters use a different boundary than the one declared in the Content-Type header. The server must de-chunk first, then detect the mismatch and respond with 400 Bad Request.";
+	testCase.configurationsForTestCase = "SETUP: '/upload' route must accept multipart/form-data. This test sends a body whose delimiters use a different boundary than the one declared in the content-type header. The server must de-chunk first, then detect the mismatch and respond with 400 Bad Request.";
 
 	testCase.timeout = -1;
 
@@ -634,7 +634,7 @@ void ChunkedTransferTests::MissingClosingBoundaryTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -664,7 +664,7 @@ void ChunkedTransferTests::BinaryDataTest()
 	// Build a single file part with binary content (includes NUL and non-ASCII bytes)
 	string part = "--" + boundary + "\r\n";
 	part += "Content-Disposition: form-data; name=\"file\"; filename=\"binary.bin\"\r\n";
-	part += "Content-Type: application/octet-stream\r\n\r\n";
+	part += "content-type: application/octet-stream\r\n\r\n";
 
 	// Binary payload: bytes 0x00,0x01,0x02,0xff,0xfe then ASCII 'Binary', NUL, 'Data'
 	string binaryData = string("\x00\x01\x02\xff\xfe,Binary\x00Data", 16);
@@ -678,7 +678,7 @@ void ChunkedTransferTests::BinaryDataTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -709,7 +709,7 @@ void ChunkedTransferTests::LargeFileStreamTest()
 	// Build a large file part
 	string part = "--" + boundary + "\r\n";
 	part += "Content-Disposition: form-data; name=\"file\"; filename=\"bigfile.bin\"\r\n";
-	part += "Content-Type: application/octet-stream\r\n\r\n";
+	part += "content-type: application/octet-stream\r\n\r\n";
 	part += string(fileSize, 'X'); // Large payload
 	part += "\r\n--" + boundary + "--\r\n";
 
@@ -727,7 +727,7 @@ void ChunkedTransferTests::LargeFileStreamTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -755,7 +755,7 @@ void ChunkedTransferTests::SlowUploadByteByByteTest()
 	// Small file part
 	string part = "--" + boundary + "\r\n";
 	part += "Content-Disposition: form-data; name=\"file\"; filename=\"slow.txt\"\r\n";
-	part += "Content-Type: text/plain\r\n\r\n";
+	part += "content-type: text/plain\r\n\r\n";
 	part += "slow upload\r\n";
 	part += "--" + boundary + "--\r\n";
 
@@ -765,7 +765,7 @@ void ChunkedTransferTests::SlowUploadByteByByteTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -798,7 +798,7 @@ void ChunkedTransferTests::FakeBoundaryInBodySlowUploadTest()
 	string seg1 =
 		"--" + boundary + "\r\n"
 		"Content-Disposition: form-data; name=\"file\"; filename=\"fake-boundary.txt\"\r\n"
-		"Content-Type: text/plain\r\n\r\n"
+		"content-type: text/plain\r\n\r\n"
 		"line-1: begin upload\r\n"
 		"line-2: fake token starts here -> \r\n--FakeBodyB";
 
@@ -813,7 +813,7 @@ void ChunkedTransferTests::FakeBoundaryInBodySlowUploadTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -849,7 +849,7 @@ void ChunkedTransferTests::PrematureEOFTest()
 	// Build a valid multipart part
 	string part = "--" + boundary + "\r\n";
 	part += "Content-Disposition: form-data; name=\"file\"; filename=\"prem.txt\"\r\n";
-	part += "Content-Type: text/plain\r\n\r\n";
+	part += "content-type: text/plain\r\n\r\n";
 	part += "premature eof\r\n";
 	part += "--" + boundary + "--\r\n";
 
@@ -860,7 +860,7 @@ void ChunkedTransferTests::PrematureEOFTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ truncated;
@@ -890,7 +890,7 @@ void ChunkedTransferTests::ChunkExtensionsAndTrailersTest()
 	// Build a simple multipart part
 	string part = "--" + boundary + "\r\n";
 	part += "Content-Disposition: form-data; name=\"file\"; filename=\"ext.txt\"\r\n";
-	part += "Content-Type: text/plain\r\n\r\n";
+	part += "content-type: text/plain\r\n\r\n";
 	part += "chunk extensions\r\n";
 	part += "--" + boundary + "--\r\n";
 
@@ -906,7 +906,7 @@ void ChunkedTransferTests::ChunkExtensionsAndTrailersTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"Trailer: X-Trailer-Header\r\n"
 		"\r\n"
@@ -971,7 +971,7 @@ void ChunkedTransferTests::ChunkSizeEdgeCasesTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
@@ -1043,7 +1043,7 @@ void ChunkedTransferTests::ContentDispositionAndFilenameTest()
 	string part1 =
 		"--" + boundary + "\r\n"
 		"Content-Disposition: form-data; name=\"file1\"; filename=\"my upload.txt\"\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"\r\n"
 		"contents of file with spaces in name\r\n";
 
@@ -1051,7 +1051,7 @@ void ChunkedTransferTests::ContentDispositionAndFilenameTest()
 	string part2 =
 		"--" + boundary + "\r\n"
 		"Content-Disposition: form-data; name=\"file2\"; filename=\"resume_(final).txt\"\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"\r\n"
 		"resume content\r\n";
 
@@ -1059,7 +1059,7 @@ void ChunkedTransferTests::ContentDispositionAndFilenameTest()
 	string part3 =
 		"--" + boundary + "\r\n"
 		"Content-Disposition: form-data; name=\"file3\"; filename=\"../evil.txt\"\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"\r\n"
 		"path traversal payload\r\n";
 
@@ -1077,7 +1077,7 @@ void ChunkedTransferTests::ContentDispositionAndFilenameTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Transfer-Encoding: chunked\r\n"
 		"\r\n"
 		+ chunkedBody;
