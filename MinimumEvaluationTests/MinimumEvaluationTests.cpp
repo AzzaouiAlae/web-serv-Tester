@@ -93,7 +93,7 @@ void MinimumEvaluationTests::PostRootReturn405()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: test/file\r\n"
+                     "content-type: test/file\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n"
                      "0\r\n"
@@ -386,7 +386,7 @@ void MinimumEvaluationTests::ChunkedLarge100MYChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: test/file\r\n"
+                     "content-type: test/file\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
     config.body = "'y' repeated 100000000 times chunked size 32768";
@@ -410,7 +410,7 @@ void MinimumEvaluationTests::ContentLengthLarge100MYChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 100000000\r\n"
-                     "Content-Type: test/file\r\n"
+                     "content-type: test/file\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
     config.body = "'y' repeated 100000000 times";
@@ -434,7 +434,7 @@ void MinimumEvaluationTests::ChunkedLarge100MEChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: test/file\r\n"
+                     "content-type: test/file\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
     config.body = "'e' repeated 100000000 times chunked size 32768";
@@ -458,7 +458,7 @@ void MinimumEvaluationTests::Chunked100KEChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: test/file\r\n"
+                     "content-type: test/file\r\n"
                      "X-Secret-Header-For-Test: 1\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
@@ -485,7 +485,7 @@ void MinimumEvaluationTests::PostBodyEmpty()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 0\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n";
     config.expectedResponse.push_back("200 OK||201 Created");
     config.timeout = 2000;
@@ -508,7 +508,7 @@ void MinimumEvaluationTests::PostBody100PChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 100\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n" +
                      body;
     config.expectedResponse.push_back("200 OK||201 Created");
@@ -533,7 +533,7 @@ void MinimumEvaluationTests::PostBody200WChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
 
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n" +
                      body;
     config.expectedResponse.push_back("413 Payload Too Large||413 Entity Too Large");
@@ -557,7 +557,7 @@ void MinimumEvaluationTests::PostBody101QCharsExceedsLimit()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Content-Length: 101\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n" +
                      body;
     config.expectedResponse.push_back("413 Payload Too Large||413 Entity Too Large");
@@ -581,7 +581,7 @@ void MinimumEvaluationTests::ChunkedPostBodyEmpty()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n"
                      "0\r\n"
                      "\r\n";
@@ -606,7 +606,7 @@ void MinimumEvaluationTests::ChunkedPostBody100PChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n"
                      "64\r\n" +
                      body + "\r\n0\r\n\r\n"; // 0x64 = 100 in decimal
@@ -631,7 +631,7 @@ void MinimumEvaluationTests::ChunkedPostBody200WChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n"
                      "c8\r\n" +
                      body + "\r\n0\r\n\r\n"; // 0xc8 = 200 in decimal
@@ -656,7 +656,7 @@ void MinimumEvaluationTests::ChunkedPostBody101QCharsExceedsLimit()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "\r\n"
                      "65\r\n" +
                      body + "\r\n0\r\n\r\n"; // 0x65 = 101 in decimal
@@ -750,7 +750,7 @@ void MinimumEvaluationTests::StressLargePOSTFork20()
     config.request = "POST /post_body HTTP/1.1\r\n"
                      "Host: 127.0.0.1:1027\r\n"
                      "Content-Length: " + to_string(body.size()) + "\r\n"
-                     "Content-Type: text/plain\r\n"
+                     "content-type: text/plain\r\n"
                      "Connection: close\r\n"
                      "\r\n" + body;
     config.name = "30 » Stress large POST fork 20";
@@ -783,7 +783,7 @@ void MinimumEvaluationTests::ChunkedForkLarge100MKChars()
                      "Host: 127.0.0.1:1027\r\n"
                      "User-Agent: Go-http-client/1.1\r\n"
                      "Transfer-Encoding: chunked\r\n"
-                     "Content-Type: test/file\r\n"
+                     "content-type: test/file\r\n"
                      "Accept-Encoding: gzip\r\n"
                      "\r\n";
     config.body = "'k' repeated 100000000 times chunked size 32768";

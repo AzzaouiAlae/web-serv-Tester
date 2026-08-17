@@ -40,7 +40,7 @@ void ClientBodySizeTests::PostWellUnderLimitTest()
 	testCase.request =
 		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
@@ -81,7 +81,7 @@ void ClientBodySizeTests::PostAtExactLimitTest()
 	testCase.request =
 		"POST /upload/ HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
@@ -123,7 +123,7 @@ void ClientBodySizeTests::PostOneByteOverLimitTest()
 	testCase.request =
 		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
@@ -168,7 +168,7 @@ void ClientBodySizeTests::PostLargeBodyRejectedTest()
 	testCase.request =
 		"POST /upload/" + GetRandem() + ".txt HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;

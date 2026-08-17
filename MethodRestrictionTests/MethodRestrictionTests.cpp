@@ -54,7 +54,7 @@ void MethodRestrictionTests::PostToGetOnlyRouteTest()
 	testCase.request =
 		"POST /get-only HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
@@ -208,7 +208,7 @@ void MethodRestrictionTests::AllowHeaderPresentOn405Test()
 	testCase.request =
 		"POST /get-only HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;

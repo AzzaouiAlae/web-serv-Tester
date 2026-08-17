@@ -30,7 +30,7 @@
 // ── CGI response format ───────────────────────────────────────────────────────
 // A CGI script writes to stdout in this format (using \n line endings):
 //
-//   Content-Type: text/plain\n
+//   content-type: text/plain\n
 //   Content-Length: N\n          ← optional; server must inject if missing
 //   \n
 //   <body>
@@ -65,7 +65,7 @@ CGITests::~CGITests()
 // Script (save as <web-root>/cgi-bin/hello.py, chmod +x):
 //   #!/usr/bin/env python3
 //   body = "CGI-GET-SENTINEL"
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(body)))
 //   print()
 //   print(body, end="")
@@ -94,7 +94,7 @@ void CGITests::CgiGetRequestTest()
 		"SETUP: Create <web-root>/cgi-bin/hello.py with:\n"
 		"  #!/usr/bin/env python3"
 		"  body = 'CGI-GET-SENTINEL'"
-		"  print('Content-Type: text/plain')"
+		"  print('content-type: text/plain')"
 		"  print('Content-Length: ' + str(len(body)))"
 		"  print()"
 		"  print(body)"
@@ -127,7 +127,7 @@ void CGITests::CgiGetRequestTest()
 //   import os, sys
 //   length = int(os.environ.get("CONTENT_LENGTH", 0))
 //   body = sys.stdin.read(length) if length > 0 else ""
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(body)))
 //   print()
 //   print(body, end="")
@@ -151,7 +151,7 @@ void CGITests::CgiPostWithBodyTest()
 	testCase.request =
 		"POST /cgi-bin/echo_post.py HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
@@ -167,7 +167,7 @@ void CGITests::CgiPostWithBodyTest()
 		"  import os, sys"
 		"  length = int(os.environ.get('CONTENT_LENGTH', 0))"
 		"  body = sys.stdin.read(length) if length > 0 else ''"
-		"  print('Content-Type: text/plain')"
+		"  print('content-type: text/plain')"
 		"  print('Content-Length: ' + str(len(body)))"
 		"  print()"
 		"  print(body)"
@@ -200,7 +200,7 @@ void CGITests::CgiPostWithBodyTest()
 //   #!/usr/bin/env python3
 //   import os
 //   line = "REQUEST_METHOD=" + os.environ.get("REQUEST_METHOD", "MISSING")
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(line)))
 //   print()
 //   print(line, end="")
@@ -230,7 +230,7 @@ void CGITests::CgiEnvVarsTest()
 		"  #!/usr/bin/env python3"
 		"  import os"
 		"  line = 'REQUEST_METHOD=' + os.environ.get('REQUEST_METHOD', 'MISSING')"
-		"  print('Content-Type: text/plain')"
+		"  print('content-type: text/plain')"
 		"  print('Content-Length: ' + str(len(line)))"
 		"  print()"
 		"  print(line)"
@@ -253,7 +253,7 @@ void CGITests::CgiEnvVarsTest()
 // The subject states: "If no content_length is returned from the CGI, EOF
 // will mark the end of the returned data."
 // This test proves the server honours that requirement:
-//   1. CGI script outputs ONLY Content-Type header — no Content-Length.
+//   1. CGI script outputs ONLY content-type header — no Content-Length.
 //   2. Server reads CGI stdout until the pipe produces EOF.
 //   3. Server buffers the entire body, computes its byte count.
 //   4. Server injects "Content-Length: N" into the HTTP response.
@@ -267,7 +267,7 @@ void CGITests::CgiEnvVarsTest()
 // Script (save as <web-root>/cgi-bin/no_cl.py, chmod +x):
 //   #!/usr/bin/env python3
 //   body = "CGI-NO-CL-BODY"
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print()
 //   print(body, end="")
 // ─────────────────────────────────────────────────────────────────────────────
@@ -298,7 +298,7 @@ void CGITests::CgiNoContentLengthTest()
 		"SETUP: Create <web-root>/cgi-bin/no_cl.py with:\n"
 		"  #!/usr/bin/env python3"
 		"  body = 'CGI-NO-CL-BODY'"
-		"  print('Content-Type: text/plain')"
+		"  print('content-type: text/plain')"
 		"  print()"
 		"  print(body)"
 		"Then: chmod +x <web-root>/cgi-bin/no_cl.py\n"
@@ -333,7 +333,7 @@ void CGITests::CgiNoContentLengthTest()
 //   #!/usr/bin/env python3
 //   import os
 //   qs = os.environ.get("QUERY_STRING", "MISSING")
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(qs)))
 //   print()
 //   print(qs)
@@ -366,7 +366,7 @@ void CGITests::CgiQueryStringTest()
 		"  #!/usr/bin/env python3\n"
 		"  import os\n"
 		"  qs = os.environ.get(\"QUERY_STRING\", \"MISSING\")\n"
-		"  print(\"Content-Type: text/plain\")\n"
+		"  print(\"content-type: text/plain\")\n"
 		"  print(\"Content-Length: \" + str(len(qs)))\n"
 		"  print()\n"
 		"  print(qs, end=\"\")\n"
@@ -401,7 +401,7 @@ void CGITests::CgiQueryStringTest()
 //   #!/usr/bin/env python3
 //   with open("data.txt", "r") as f:
 //       body = f.read().strip()
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(body)))
 //   print()
 //   print(body, end="")
@@ -435,7 +435,7 @@ void CGITests::CgiWorkingDirectoryTest()
 		"     #!/usr/bin/env python3\n"
 		"     with open(\"data.txt\", \"r\") as f:\n"
 		"         body = f.read().strip()\n"
-		"     print(\"Content-Type: text/plain\")\n"
+		"     print(\"content-type: text/plain\")\n"
 		"     print(\"Content-Length: \" + str(len(body)))\n"
 		"     print()\n"
 		"     print(body, end=\"\")\n"
@@ -477,7 +477,7 @@ void CGITests::CgiWorkingDirectoryTest()
 //   #!/usr/bin/env python3
 //   import time
 //   time.sleep(30)
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: 0")
 //   print()
 // ─────────────────────────────────────────────────────────────────────────────
@@ -505,7 +505,7 @@ void CGITests::CgiTimeoutTest()
 		"  #!/usr/bin/env python3\n"
 		"  import time\n"
 		"  time.sleep(30)\n"
-		"  print(\"Content-Type: text/plain\")\n"
+		"  print(\"content-type: text/plain\")\n"
 		"  print(\"Content-Length: 0\")\n"
 		"  print()\n"
 		"Then: chmod +x <web-root>/cgi-bin/sleeper.py\n"

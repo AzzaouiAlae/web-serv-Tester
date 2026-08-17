@@ -35,7 +35,7 @@ string SESSION_COOKIE_NAME = "SESSION_ID";
 //   #!/usr/bin/env python3
 //   import os
 //   val = os.environ.get("HTTP_COOKIE", "NO_COOKIE_ENV_VAR")
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(val)))
 //   print()
 //   print(val, end="")
@@ -61,7 +61,7 @@ string SESSION_COOKIE_NAME = "SESSION_ID";
 //       result = "WRITE-OK"
 //   else:
 //       result = "NO-SESSION"
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(result)))
 //   print()
 //   print(result, end="")
@@ -86,7 +86,7 @@ string SESSION_COOKIE_NAME = "SESSION_ID";
 //               result = f.read()
 //       except:
 //           result = "FILE-NOT-FOUND"
-//   print("Content-Type: text/plain")
+//   print("content-type: text/plain")
 //   print("Content-Length: " + str(len(result)))
 //   print()
 //   print(result, end="")
@@ -488,7 +488,7 @@ void SessionTests::SessionDataStoredTest()
 	writeCase.request =
 		"POST /cgi-bin/session_write.py HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: text/plain\r\n"
+		"content-type: text/plain\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"Cookie: " + SESSION_COOKIE_NAME + "=" + sessionId + "\r\n"
 		"\r\n"

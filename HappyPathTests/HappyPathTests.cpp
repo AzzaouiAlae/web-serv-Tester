@@ -144,7 +144,7 @@ void HappyPathTests::HeadRequestTest()
 		testCase.expectedResponse.push_back(header);
 	}
 
-	testCase.configurationsForTestCase = "NOTE: A HEAD request must return the exact same headers as a GET request (Content-Length, Content-Type, Allow, Server, etc.) but MUST NOT send any response body. Dynamic headers like Date and Set-Cookie are ignored in this comparison. This test first retrieves the headers from a GET request to '/', then verifies that HEAD returns identical stable headers without any body content.";
+	testCase.configurationsForTestCase = "NOTE: A HEAD request must return the exact same headers as a GET request (Content-Length, content-type, Allow, Server, etc.) but MUST NOT send any response body. Dynamic headers like Date and Set-Cookie are ignored in this comparison. This test first retrieves the headers from a GET request to '/', then verifies that HEAD returns identical stable headers without any body content.";
 
 	testCase.timeout = 2000;
 
@@ -166,7 +166,7 @@ void HappyPathTests::PostSimpleTextTest()
 
 	testCase.request = "POST /upload/delete_me.txt HTTP/1.1\r\n"
 					   "Host: localhost\r\n"
-					   "Content-Type: text/plain\r\n"
+					   "content-type: text/plain\r\n"
 					   "Content-Length: " + contentLength + "\r\n"
 					   "\r\n"
 					   + body;
@@ -208,7 +208,7 @@ void HappyPathTests::GetCssFileTest()
 	// arrange
 	TestCase testCase;
 	testCase.name = "8 » Get Css File Test";
-	testCase.description = "Test to check if the server serves a CSS file with the correct Content-Type header.";
+	testCase.description = "Test to check if the server serves a CSS file with the correct content-type header.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
@@ -217,9 +217,9 @@ void HappyPathTests::GetCssFileTest()
 					   "\r\n";
 
 	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
-	testCase.expectedResponse.push_back("Content-Type: text/css");
+	testCase.expectedResponse.push_back("content-type: text/css");
 
-	testCase.configurationsForTestCase = "NOTE: Ensure a file named 'styles.css' exists in the server's web root. The server should respond with 'Content-Type: text/css' in the headers. This test validates that the MIME type resolution for '.css' extensions is implemented correctly.";
+	testCase.configurationsForTestCase = "NOTE: Ensure a file named 'styles.css' exists in the server's web root. The server should respond with 'content-type: text/css' in the headers. This test validates that the MIME type resolution for '.css' extensions is implemented correctly.";
 
 	testCase.timeout = 2000;
 
@@ -231,7 +231,7 @@ void HappyPathTests::GetImageFileTest()
 	// arrange
 	TestCase testCase;
 	testCase.name = "9 » Get Image File Test";
-	testCase.description = "Test to check if the server serves a PNG image with the correct Content-Type header.";
+	testCase.description = "Test to check if the server serves a PNG image with the correct content-type header.";
 	testCase.port = "1025";
 	testCase.host = "localhost";
 
@@ -240,8 +240,8 @@ void HappyPathTests::GetImageFileTest()
 					   "\r\n";
 
 	testCase.expectedResponse.push_back("HTTP/1.1 200 OK");
-	testCase.expectedResponse.push_back("Content-Type: image/jpeg");
-	testCase.configurationsForTestCase = "NOTE: Ensure a valid JPEG file named 'test.jpg' exists inside the server's '/images' directory. The server should respond with 'Content-Type: image/jpeg'. File reading must use binary-safe read() calls, not string-based functions, to avoid truncation on null bytes.";
+	testCase.expectedResponse.push_back("content-type: image/jpeg");
+	testCase.configurationsForTestCase = "NOTE: Ensure a valid JPEG file named 'test.jpg' exists inside the server's '/images' directory. The server should respond with 'content-type: image/jpeg'. File reading must use binary-safe read() calls, not string-based functions, to avoid truncation on null bytes.";
 
 	testCase.timeout = 2000;
 
@@ -288,7 +288,7 @@ void HappyPathTests::PostUploadBinaryFileTest()
 	
 	body += "--" + boundary + "\r\n";
 	body += "Content-Disposition: form-data; name=\"file\"; filename=\"image.png\"\r\n";
-	body += "Content-Type: image/png\r\n";
+	body += "content-type: image/png\r\n";
 	body += "\r\n";
 	body += pngData;
 	body += "\r\n--" + boundary + "--\r\n";
@@ -298,7 +298,7 @@ void HappyPathTests::PostUploadBinaryFileTest()
 	testCase.request =
 		"POST /upload HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
@@ -332,7 +332,7 @@ void HappyPathTests::PostOnRootTest()
 	
 	body += "--" + boundary + "\r\n";
 	body += "Content-Disposition: form-data; name=\"file\"; filename=\"image.png\"\r\n";
-	body += "Content-Type: image/png\r\n";
+	body += "content-type: image/png\r\n";
 	body += "\r\n";
 	body += pngData;
 	body += "\r\n--" + boundary + "--\r\n";
@@ -342,7 +342,7 @@ void HappyPathTests::PostOnRootTest()
 	testCase.request =
 		"POST / HTTP/1.1\r\n"
 		"Host: localhost\r\n"
-		"Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+		"content-type: multipart/form-data; boundary=" + boundary + "\r\n"
 		"Content-Length: " + contentLength + "\r\n"
 		"\r\n"
 		+ body;
