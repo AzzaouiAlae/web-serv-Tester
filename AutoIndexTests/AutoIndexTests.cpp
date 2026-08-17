@@ -9,7 +9,7 @@
 //   location /autoindex-dir {
 //       autoindex  on;
 //   }
-//
+// dir 39lek a alaa
 //   # 2. autoindex OFF, no default index file
 //   location /no-index-dir {
 //       autoindex  off;
