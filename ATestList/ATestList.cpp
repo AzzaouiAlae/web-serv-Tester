@@ -91,6 +91,19 @@ namespace
 		return lowered;
 	}
 
+	static string trimCopy(const string &value)
+	{
+		size_t start = 0;
+		while (start < value.size() && isspace((unsigned char)value[start]))
+			++start;
+
+		size_t end = value.size();
+		while (end > start && isspace((unsigned char)value[end - 1]))
+			--end;
+
+		return value.substr(start, end - start);
+	}
+
 	static bool decodeChunkedBody(const string &chunkedBody, string &decodedBody)
 	{
 		decodedBody.clear();
@@ -253,6 +266,70 @@ namespace
 		return sentBytes >= 0;
 	}
 
+	// Splits a header-shaped expectation ("Content-Type: text/html", "Allow:")
+	// into a lowercased field name and value. Anything else (status lines, body
+	// sentinels) is rejected so it keeps being matched literally.
+	static bool splitHeaderPattern(const string &pattern, string &name, string &value)
+	{
+		size_t colon = pattern.find(':');
+		if (colon == string::npos || colon == 0)
+			return false;
+
+		for (size_t i = 0; i < colon; ++i)
+		{
+			char c = pattern[i];
+			if (!isalnum((unsigned char)c) && c != '-' && c != '_')
+				return false;
+		}
+
+		name = toLowerCopy(pattern.substr(0, colon));
+		value = toLowerCopy(trimCopy(pattern.substr(colon + 1)));
+		return true;
+	}
+
+	// Field names are case-insensitive and the whitespace after the colon is not
+	// fixed, so "Content-Type: text/html" must also match "content-type:TEXT/HTML".
+	static bool matchesHeaderField(const string &header, const string &name, const string &value)
+	{
+		string lowered = toLowerCopy(header);
+		size_t lineStart = 0;
+
+		while (lineStart < lowered.size())
+		{
+			size_t lineEnd = lowered.find('\n', lineStart);
+			string line = (lineEnd == string::npos) ? lowered.substr(lineStart)
+													: lowered.substr(lineStart, lineEnd - lineStart);
+
+			size_t colon = line.find(':');
+			if (colon != string::npos && trimCopy(line.substr(0, colon)) == name &&
+				trimCopy(line.substr(colon + 1)).find(value) != string::npos)
+				return true;
+
+			if (lineEnd == string::npos)
+				break;
+			lineStart = lineEnd + 1;
+		}
+		return false;
+	}
+
+	static bool containsPattern(const string &haystack, const string &pattern)
+	{
+		if (haystack.find(pattern) != string::npos)
+			return true;
+
+		string name;
+		string value;
+		if (!splitHeaderPattern(pattern, name, value))
+			return false;
+
+		// Only the header section is rescanned case-insensitively: lowercasing a
+		// multi-megabyte body to look for a header field would be wasted work.
+		size_t headerEnd = haystack.find("\r\n\r\n");
+		if (headerEnd == string::npos)
+			return matchesHeaderField(haystack, name, value);
+		return matchesHeaderField(haystack.substr(0, headerEnd + 2), name, value);
+	}
+
 	static bool matchAnyOrPattern(const string &haystack, const string &pattern)
 	{
 		size_t pos = 0;
@@ -260,7 +337,7 @@ namespace
 		{
 			size_t sep = pattern.find("||", pos);
 			string candidate = (sep == string::npos) ? pattern.substr(pos) : pattern.substr(pos, sep - pos);
-			if (haystack.find(candidate) != string::npos)
+			if (containsPattern(haystack, candidate))
 				return true;
 			if (sep == string::npos)
 				break;
@@ -360,19 +437,6 @@ namespace
 	{
 		string lowered = toLowerCopy(header);
 		return lowered.find("transfer-encoding:") != string::npos && lowered.find("chunked") != string::npos;
-	}
-
-	static string trimCopy(const string &value)
-	{
-		size_t start = 0;
-		while (start < value.size() && isspace((unsigned char)value[start]))
-			++start;
-
-		size_t end = value.size();
-		while (end > start && isspace((unsigned char)value[end - 1]))
-			--end;
-
-		return value.substr(start, end - start);
 	}
 
 	static bool parseHttpStatusCode(const string &header, int &statusCode)
@@ -655,7 +719,7 @@ namespace
 			return responseBody.find(pattern) != string::npos;
 		}
 
-		return response.find(pattern) != string::npos;
+		return containsPattern(response, pattern);
 	}
 
 	static bool validateExpectedPatternsAgainstResponse(const string &response,
